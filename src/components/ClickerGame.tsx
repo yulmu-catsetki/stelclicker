@@ -36,7 +36,9 @@ const ClickerGame = () => {
   const [popups, setPopups] = useState<Popup[]>([]);
 
   // Effects
-  useEffect(() => { document.body.style.backgroundColor = bgColor; }, [bgColor]);
+  useEffect(() => {
+    document.body.style.backgroundColor = bgColor;
+  }, [bgColor]);
   useEffect(() => {
     const audioElement = new Audio('/asset/shibuki/debakbak.mp3');
     setAudio(audioElement);
@@ -53,28 +55,32 @@ const ClickerGame = () => {
 
   const handleInteraction = (e: React.MouseEvent | React.TouchEvent) => {
     if (e.type === 'touchstart') e.preventDefault();
-    if (triggerInput) triggerInput.fire();
-    if (audio) {
-      audio.currentTime = 0;
-      audio.play().catch(err => console.error('Error playing audio:', err));
+    if (triggerInput) {
+      triggerInput.fire();
+      if (audio) {
+        audio.currentTime = 0;
+        audio.play().catch(err => console.error('Error playing audio:', err));
+      }
+      setClickCount(prev => prev + 1);
+
+      // 애니메이션 업데이트 (랜덤 회전만 적용)
+      const angle = Math.random() < 0.5 ? 10 : -10;
+      setRotateAngle(angle);
+      setAnimateCount(true);
+      setTimeout(() => {
+        setAnimateCount(false);
+      }, 300);
+
+      // popup 추가 (랜덤 위치)
+      const { top, left } = getRandomPopupPosition();
+      const popupId = Date.now();
+      setPopups(prev => [...prev, { id: popupId, top, left }]);
     }
-    setClickCount(prev => prev + 1);
-
-    // 애니메이션 업데이트 (랜덤 회전만 적용)
-    const angle = Math.random() < 0.5 ? 10 : -10;
-    setRotateAngle(angle);
-    setAnimateCount(true);
-    setTimeout(() => {
-      setAnimateCount(false);
-    }, 300);
-
-    // popup 추가 (랜덤 위치)
-    const { top, left } = getRandomPopupPosition();
-    const popupId = Date.now();
-    setPopups(prev => [...prev, { id: popupId, top, left }]);
   };
 
-  const handleChangeSkin = () => { console.log('Change Skin 버튼 클릭'); };
+  const handleChangeSkin = () => {
+    console.log('Change Skin 버튼 클릭');
+  };
   const handleChangeCharacter = () => {
     setBgColor(prev => prev === "#C2AFE6" ? "#FFB6C1" : "#C2AFE6");
     console.log('Change Character 버튼 클릭');
@@ -89,10 +95,14 @@ const ClickerGame = () => {
       >
         {clickCount}
       </div>
-      
+
       {/* Rive Animation Container with popups */}
-      <div className="riveContainer" onClick={handleInteraction} onTouchStart={handleInteraction}>
-        <RiveComponent />
+      <div className="riveContainer">
+        <RiveComponent
+          style={{ pointerEvents: 'auto' }}
+          onClick={handleInteraction}
+          onTouchStart={handleInteraction}
+        />
         {popups.map(popup => (
           <span
             key={popup.id}
@@ -104,7 +114,7 @@ const ClickerGame = () => {
           </span>
         ))}
       </div>
-      
+
       {/* 스킨 & 캐릭터 변경 버튼 */}
       <div className="buttonContainer">
         <button className="buttonSkin" onClick={handleChangeSkin}>스킨 변경</button>

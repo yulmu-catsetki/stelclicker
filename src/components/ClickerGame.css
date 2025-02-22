@@ -15,6 +15,7 @@
   margin-bottom: 2rem;
   color: #ffffff;
   transition: transform 0.3s ease-in-out, color 0.3s ease-in-out;
+  user-select: none;
 }
 
 .riveContainer {
@@ -26,6 +27,11 @@
   justify-content: center;
   align-items: center;
   position: relative; /* popup 위치 기준 */
+  pointer-events: none;
+}
+
+.riveContainer canvas {
+  pointer-events: auto;
 }
 
 /* popup 스타일 및 애니메이션 */
@@ -35,6 +41,7 @@
   color: #ffffff;
   pointer-events: none;
   animation: popupAnimate 0.5s ease-out forwards;
+  user-select: none;
 }
 
 @keyframes popupAnimate {
@@ -62,6 +69,7 @@
   cursor: pointer;
   transition: background-color 0.3s ease;
   border: none;
+  user-select: none;
 }
 
 .buttonSkin {
