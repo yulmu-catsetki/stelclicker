@@ -34,11 +34,11 @@ const ClickerGame = () => {
   const [animateCount, setAnimateCount] = useState(false);
   const [rotateAngle, setRotateAngle] = useState(0);
   const [popups, setPopups] = useState<Popup[]>([]);
+  const [numberValue, setNumberValue] = useState(0); // Add state for number value
   const fadeOutIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isClickingRef = useRef(false);
 
   const fadeOutAudio = (audio: HTMLAudioElement, duration = 1200) => {
-    // clear any previous fade-out interval
     if (fadeOutIntervalRef.current) {
       clearInterval(fadeOutIntervalRef.current);
       fadeOutIntervalRef.current = null;
@@ -57,7 +57,7 @@ const ClickerGame = () => {
         }
         audio.pause();
         audio.currentTime = 0;
-        audio.volume = 1; // 볼륨 초기화
+        audio.volume = 1;
       }
     }, stepTime);
   };
@@ -66,6 +66,7 @@ const ClickerGame = () => {
   useEffect(() => {
     document.body.style.backgroundColor = bgColor;
   }, [bgColor]);
+  
   useEffect(() => {
     const audioElement = new Audio('/asset/shibuki/debakbak.mp3');
     setAudio(audioElement);
@@ -78,18 +79,25 @@ const ClickerGame = () => {
     artboard: 'Artboard',
     autoplay: true,
   });
+  
   const triggerInput = useStateMachineInput(rive, 'State Machine 1', 'Trigger 1');
+  const numberInput = useStateMachineInput(rive, 'State Machine 1', 'number'); // Add number input
+
+  // Update number input when numberValue changes
+  useEffect(() => {
+    if (numberInput) {
+      numberInput.value = numberValue;
+    }
+  }, [numberValue, numberInput]);
 
   const handleInteraction = (e: React.PointerEvent) => {
     e.preventDefault();
-    // 이미 클릭 중이면 무시
     if (isClickingRef.current) return;
     
     if (triggerInput) {
       isClickingRef.current = true;
       triggerInput.fire();
       if (audio) {
-        // 재생 전 기존 fade-out 취소 및 볼륨 초기화
         if (fadeOutIntervalRef.current) {
           clearInterval(fadeOutIntervalRef.current);
           fadeOutIntervalRef.current = null;
@@ -101,7 +109,6 @@ const ClickerGame = () => {
       }
       setClickCount(prev => prev + 1);
 
-      // 애니메이션 업데이트 (랜덤 회전만 적용)
       const angle = Math.random() < 0.5 ? 10 : -10;
       setRotateAngle(angle);
       setAnimateCount(true);
@@ -109,12 +116,10 @@ const ClickerGame = () => {
         setAnimateCount(false);
       }, 300);
 
-      // popup 추가 (랜덤 위치)
       const { top, left } = getRandomPopupPosition();
       const popupId = Date.now();
       setPopups(prev => [...prev, { id: popupId, top, left }]);
       
-      // 포인터가 떨어질 때 클릭 상태 해제
       const pointerUpHandler = () => {
         isClickingRef.current = false;
         window.removeEventListener('pointerup', pointerUpHandler);
@@ -126,14 +131,16 @@ const ClickerGame = () => {
   const handleChangeSkin = () => {
     console.log('Change Skin 버튼 클릭');
   };
+
   const handleChangeCharacter = () => {
     setBgColor(prev => prev === "#C2AFE6" ? "#FFB6C1" : "#C2AFE6");
+    // Toggle number value between 0 and 1
+    setNumberValue(prev => prev === 0 ? 1 : 0);
     console.log('Change Character 버튼 클릭');
   };
 
   return (
     <div className="container" style={{ backgroundColor: bgColor }}>
-      {/* Click Counter */}
       <div
         className="clickCounter"
         style={animateCount ? { transform: `scale(1.2) rotate(${rotateAngle}deg)` } : {}}
@@ -141,7 +148,6 @@ const ClickerGame = () => {
         {clickCount}
       </div>
 
-      {/* Rive Animation Container with popups */}
       <div className="riveContainer">
         <RiveComponent
           style={{ pointerEvents: 'auto' }}
@@ -159,7 +165,6 @@ const ClickerGame = () => {
         ))}
       </div>
 
-      {/* 스킨 & 캐릭터 변경 버튼 */}
       <div className="buttonContainer">
         <button className="buttonSkin" onClick={handleChangeSkin}>스킨 변경</button>
         <button className="buttonCharacter" onClick={handleChangeCharacter}>캐릭터 변경</button>
