@@ -34,7 +34,6 @@ const ClickerGame = () => {
   const [animateCount, setAnimateCount] = useState(false);
   const [rotateAngle, setRotateAngle] = useState(0);
   const [popups, setPopups] = useState<Popup[]>([]);
-  const lastTouchRef = useRef(0);
   const fadeOutIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fadeOutAudio = (audio: HTMLAudioElement, duration = 1200) => {
@@ -80,8 +79,8 @@ const ClickerGame = () => {
   });
   const triggerInput = useStateMachineInput(rive, 'State Machine 1', 'Trigger 1');
 
-  const handleInteraction = (e: React.MouseEvent | React.TouchEvent) => {
-    if (e.type === 'touchstart') e.preventDefault();
+  const handleInteraction = (e: React.PointerEvent) => {
+    e.preventDefault();
     if (triggerInput) {
       triggerInput.fire();
       if (audio) {
@@ -112,16 +111,6 @@ const ClickerGame = () => {
     }
   };
 
-  const handleTouch = (e: React.TouchEvent) => {
-    lastTouchRef.current = Date.now();
-    handleInteraction(e);
-  };
-
-  const handleClick = (e: React.MouseEvent) => {
-    if (Date.now() - lastTouchRef.current < 500) return;
-    handleInteraction(e);
-  };
-
   const handleChangeSkin = () => {
     console.log('Change Skin 버튼 클릭');
   };
@@ -144,8 +133,7 @@ const ClickerGame = () => {
       <div className="riveContainer">
         <RiveComponent
           style={{ pointerEvents: 'auto' }}
-          onTouchStart={handleTouch}
-          onClick={handleClick}
+          onPointerDown={handleInteraction}
         />
         {popups.map(popup => (
           <span
