@@ -68,9 +68,10 @@ const ClickerGame = () => {
   }, [bgColor]);
   
   useEffect(() => {
-    const audioElement = new Audio('/asset/shibuki/debakbak.mp3');
+    const audioPath = numberValue === 0 ? '/asset/shibuki/debakbak.mp3' : '/asset/shibuki/gomapdei.mp3';
+    const audioElement = new Audio(audioPath);
     setAudio(audioElement);
-  }, []);
+  }, [numberValue]);
 
   // Rive 초기화
   const { rive, RiveComponent } = useRive({
