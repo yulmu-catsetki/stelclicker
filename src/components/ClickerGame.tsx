@@ -35,6 +35,7 @@ const ClickerGame = () => {
   const [rotateAngle, setRotateAngle] = useState(0);
   const [popups, setPopups] = useState<Popup[]>([]);
   const fadeOutIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isClickingRef = useRef(false);
 
   const fadeOutAudio = (audio: HTMLAudioElement, duration = 1200) => {
     // clear any previous fade-out interval
@@ -81,7 +82,11 @@ const ClickerGame = () => {
 
   const handleInteraction = (e: React.PointerEvent) => {
     e.preventDefault();
+    // 이미 클릭 중이면 무시
+    if (isClickingRef.current) return;
+    
     if (triggerInput) {
+      isClickingRef.current = true;
       triggerInput.fire();
       if (audio) {
         // 재생 전 기존 fade-out 취소 및 볼륨 초기화
@@ -108,6 +113,13 @@ const ClickerGame = () => {
       const { top, left } = getRandomPopupPosition();
       const popupId = Date.now();
       setPopups(prev => [...prev, { id: popupId, top, left }]);
+      
+      // 포인터가 떨어질 때 클릭 상태 해제
+      const pointerUpHandler = () => {
+        isClickingRef.current = false;
+        window.removeEventListener('pointerup', pointerUpHandler);
+      };
+      window.addEventListener('pointerup', pointerUpHandler);
     }
   };
 
