@@ -26,7 +26,12 @@ const ClickerGame = () => {
     'Trigger 1'
   );
 
-  const handleClick = () => {
+  const handleInteraction = (e: React.MouseEvent | React.TouchEvent) => {
+    // Prevent default touch behavior
+    if (e.type === 'touchstart') {
+      e.preventDefault();
+    }
+
     // Trigger Rive animation
     if (triggerInput) {
       triggerInput.fire();
@@ -54,8 +59,9 @@ const ClickerGame = () => {
       
       {/* Rive Animation Container */}
       <div 
-        className="w-64 h-64 cursor-pointer"
-        onClick={handleClick}
+        className="w-64 h-64 cursor-pointer touch-none"
+        onClick={handleInteraction}
+        onTouchStart={handleInteraction}
       >
         <RiveComponent />
       </div>
@@ -64,4 +70,3 @@ const ClickerGame = () => {
 };
 
 export default ClickerGame;
-
