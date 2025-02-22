@@ -5,56 +5,75 @@
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  /* 배경색 제거 */
   margin: 0 auto;
   text-align: center;
 }
 
 .clickCounter {
-  font-size: 2.25rem; /* text-4xl */
+  font-size: 3rem; /* 변경된 폰트 크기 */
   font-weight: bold;
-  margin-bottom: 2rem; /* mb-8 */
+  margin-bottom: 2rem;
   color: #ffffff;
+  transition: transform 0.3s ease-in-out, color 0.3s ease-in-out;
 }
 
 .riveContainer {
-  width: 32rem;  /* 확대된 너비 */
-  height: 32rem; /* 확대된 높이 */
+  width: 32rem;
+  height: 32rem;
   cursor: pointer;
   touch-action: none;
   display: flex;
   justify-content: center;
   align-items: center;
+  position: relative; /* popup 위치 기준 */
+}
+
+/* popup 스타일 및 애니메이션 */
+.popup {
+  position: absolute;
+  font-size: 2rem; /* 확대된 폰트 크기 */
+  color: #ffffff;
+  pointer-events: none;
+  animation: popupAnimate 0.5s ease-out forwards;
+}
+
+@keyframes popupAnimate {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-30%) scale(1.2);
+  }
 }
 
 .buttonContainer {
   display: flex;
-  margin-top: 2rem; /* mt-8 */
-  gap: 1rem; /* space-x-4 */
+  margin-top: 2rem;
+  gap: 1rem;
 }
 
 .buttonSkin,
 .buttonCharacter {
-  padding: 0.5rem 1rem; /* py-2 px-4 */
+  padding: 0.5rem 1rem;
   color: #ffffff;
-  border-radius: 0.375rem; /* rounded */
+  border-radius: 0.375rem;
   cursor: pointer;
   transition: background-color 0.3s ease;
   border: none;
 }
 
 .buttonSkin {
-  background-color: #3B82F6; /* blue-500 */
+  background-color: #3B82F6;
 }
-
 .buttonSkin:hover {
-  background-color: #2563EB; /* blue-600 */
+  background-color: #2563EB;
 }
 
 .buttonCharacter {
-  background-color: #10B981; /* green-500 */
+  background-color: #10B981;
 }
-
 .buttonCharacter:hover {
-  background-color: #059669; /* green-600 */
+  background-color: #059669;
 }
