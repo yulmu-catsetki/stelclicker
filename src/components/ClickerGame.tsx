@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRive, useStateMachineInput } from '@rive-app/react-canvas';
 import './ClickerGame.css';
 
@@ -34,6 +34,32 @@ const ClickerGame = () => {
   const [animateCount, setAnimateCount] = useState(false);
   const [rotateAngle, setRotateAngle] = useState(0);
   const [popups, setPopups] = useState<Popup[]>([]);
+  const fadeOutIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fadeOutAudio = (audio: HTMLAudioElement, duration = 1200) => {
+    // clear any previous fade-out interval
+    if (fadeOutIntervalRef.current) {
+      clearInterval(fadeOutIntervalRef.current);
+      fadeOutIntervalRef.current = null;
+    }
+    const steps = 20;
+    const stepTime = duration / steps;
+    const fadeStep = audio.volume / steps;
+    fadeOutIntervalRef.current = setInterval(() => {
+      if (audio.volume > fadeStep) {
+        audio.volume = Math.max(0, audio.volume - fadeStep);
+      } else {
+        audio.volume = 0;
+        if (fadeOutIntervalRef.current) {
+          clearInterval(fadeOutIntervalRef.current);
+          fadeOutIntervalRef.current = null;
+        }
+        audio.pause();
+        audio.currentTime = 0;
+        audio.volume = 1; // 볼륨 초기화
+      }
+    }, stepTime);
+  };
 
   // Effects
   useEffect(() => {
@@ -53,13 +79,20 @@ const ClickerGame = () => {
   });
   const triggerInput = useStateMachineInput(rive, 'State Machine 1', 'Trigger 1');
 
-  const handleInteraction = (e: React.MouseEvent | React.TouchEvent) => {
-    if (e.type === 'touchstart') e.preventDefault();
+  const handleInteraction = (e: React.PointerEvent) => {
+    e.preventDefault();
     if (triggerInput) {
       triggerInput.fire();
       if (audio) {
+        // 재생 전 기존 fade-out 취소 및 볼륨 초기화
+        if (fadeOutIntervalRef.current) {
+          clearInterval(fadeOutIntervalRef.current);
+          fadeOutIntervalRef.current = null;
+        }
+        audio.volume = 1;
         audio.currentTime = 0;
         audio.play().catch(err => console.error('Error playing audio:', err));
+        fadeOutAudio(audio);
       }
       setClickCount(prev => prev + 1);
 
@@ -100,8 +133,7 @@ const ClickerGame = () => {
       <div className="riveContainer">
         <RiveComponent
           style={{ pointerEvents: 'auto' }}
-          onClick={handleInteraction}
-          onTouchStart={handleInteraction}
+          onPointerDown={handleInteraction}
         />
         {popups.map(popup => (
           <span
