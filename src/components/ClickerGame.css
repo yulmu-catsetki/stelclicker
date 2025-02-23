@@ -252,3 +252,68 @@
   color: #ffffff;
   margin-bottom: 0.2rem;
 }
+
+/* 업데이트: 폭죽 입자 스타일 및 애니메이션 변경 - 배경색보다 더 밝은 색 사용 */
+.firework {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: var(--bright-color);
+  border-radius: 50%;
+  opacity: 0.9;
+  animation: explosion 1.5s forwards;
+}
+
+.fireworks-container {
+  pointer-events: none;
+}
+
+/* keyframes: 초기 목표(dx, dy)로 이동 후 추가 50px 하강 (중력 효과) */
+@keyframes explosion {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(var(--dx), var(--dy)) scale(0.8);
+    opacity: 0.7;
+  }
+  100% {
+    transform: translate(var(--dx), calc(var(--dy) + 50px)) scale(0.7);
+    opacity: 0;
+  }
+}
+
+.firework-left {
+  top: 50%;
+  left: 0%;
+  animation: explosionLeft 1.5s forwards;
+}
+
+.firework-right {
+  top: 50%;
+  right: 0%;
+  animation: explosionRight 1.5s forwards;
+}
+
+@keyframes explosionLeft {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-100px, -60px) scale(0.7);
+    opacity: 0;
+  }
+}
+
+@keyframes explosionRight {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(100px, -60px) scale(0.7);
+    opacity: 0;
+  }
+}
