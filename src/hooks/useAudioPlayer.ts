@@ -32,6 +32,23 @@ export function useAudioPlayer(
     };
   }, [charSounds]);
 
+  useEffect(() => {
+    const handleFocus = async () => {
+      if (audioContextRef.current && audioContextRef.current.state === "suspended") {
+        try {
+          await audioContextRef.current.resume();
+          console.log("Audio context resumed on focus.");
+        } catch (error) {
+          console.error("Audio context resume failed:", error);
+        }
+      }
+    };
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, []);
+
   const playSound = useCallback(
     async (index: number) => {
       if (
