@@ -50,6 +50,7 @@ export function useAudioPlayer(
   const playSound = useCallback(
     async (index: number) => {
       if (!soundEnabled || !isInitializedRef.current) return;
+      if (volume === 0) return; // 볼륨이 0이면 소리를 재생하지 않음 (완전 침묵)
       try {
         if (audioContextRef.current?.state === "suspended") {
           await audioContextRef.current.resume();
@@ -70,8 +71,7 @@ export function useAudioPlayer(
         source.connect(gainNode);
         gainNode.connect(audioContextRef.current!.destination);
 
-        // volume이 0일 때는 0.001로 처리하여 exponentialRampToValueAtTime의 오류 방지
-        const volumeFactor = volume === 0 ? 0.001 : volume / 100;
+        const volumeFactor = volume / 200; // 볼륨 조절
         gainNode.gain.setValueAtTime(0.001, audioContextRef.current!.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(
           volumeFactor,
