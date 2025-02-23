@@ -9,6 +9,7 @@ export function useAudioPlayer(
   const audioBuffersRef = useRef<AudioBuffer[]>([]);
   const currentAudioSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const isInitializedRef = useRef(false);
+  const fadeOutTimerRef = useRef<number | null>(null);
 
   const initializeAudio = useCallback(async () => {
     if (isInitializedRef.current || !soundEnabled) return;
@@ -52,6 +53,10 @@ export function useAudioPlayer(
         if (audioContextRef.current?.state === "suspended") {
           await audioContextRef.current.resume();
         }
+        if (fadeOutTimerRef.current !== null) {
+          clearTimeout(fadeOutTimerRef.current);
+          fadeOutTimerRef.current = null;
+        }
         if (currentAudioSourceRef.current) {
           currentAudioSourceRef.current.stop();
           currentAudioSourceRef.current.disconnect();
@@ -67,19 +72,20 @@ export function useAudioPlayer(
         gainNode.gain.setValueAtTime(0.001, audioContextRef.current!.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(
           1,
-          audioContextRef.current!.currentTime + 0.1
+          audioContextRef.current!.currentTime + 0.01
         );
-        source.start(0);
+        source.start(0, 0);
         const fadeDuration = fadeDurations[index] / 1000;
         gainNode.gain.linearRampToValueAtTime(
           0,
           audioContextRef.current!.currentTime + fadeDuration * 1.2
         );
-        setTimeout(() => {
+        fadeOutTimerRef.current = window.setTimeout(() => {
           source.stop();
           source.disconnect();
           gainNode.disconnect();
           currentAudioSourceRef.current = null;
+          fadeOutTimerRef.current = null;
         }, fadeDuration * 1.2 * 1000);
       } catch (error) {
         console.error("Sound playback error:", error);
