@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useRive, useStateMachineInput } from "@rive-app/react-canvas";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faChartBar, faChevronUp, faChevronDown, faPaintBrush, faUser, faVolumeUp, faVolumeMute } from "@fortawesome/free-solid-svg-icons";
+import { faChartBar, faChevronUp, faChevronDown, faPaintBrush, faUser, faVolumeUp, faVolumeMute, faInfoCircle } from "@fortawesome/free-solid-svg-icons";
 import "./ClickerGame.css";
 
 type Popup = { id: number; top: string; left: string; message: string };
@@ -53,7 +53,8 @@ const ClickerGame = () => {
   const [statsOpen, setStatsOpen] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [avgSps, setAvgSps] = useState(0);
-  
+  const [infoModalOpen, setInfoModalOpen] = useState(false);
+
   const clickTimestampsRef = useRef<number[]>([]);
   const fadeOutIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isClickingRef = useRef(false);
@@ -148,14 +149,14 @@ const ClickerGame = () => {
     }
   };
 
-  // SPS 업데이트 (100ms마다 지난 1초 클릭수 계산)
+  // SPS (Stel Per Second, 초당 클릭 수) 계산
   useEffect(() => {
     const interval = setInterval(() => {
       const now = Date.now();
       clickTimestampsRef.current = clickTimestampsRef.current.filter(ts => now - ts <= 1000); // 최근 1초 클릭 수 계산
       const currentSps = clickTimestampsRef.current.length;
       setAvgSps(prev => prev * 0.9 + currentSps * 0.1); // 지수 가중 이동 평균 계산 (0.9, 0.1은 가중치)
-    }, 100);
+    }, 200);
     return () => clearInterval(interval);
   }, []);
 
@@ -175,6 +176,14 @@ const ClickerGame = () => {
 
   const handleToggleSound = useCallback(() => {
     setSoundEnabled(prev => !prev);
+  }, []);
+
+  // 정보 모달 열기/닫기 핸들러
+  const handleOpenInfo = useCallback(() => {
+    setInfoModalOpen(true);
+  }, []);
+  const handleCloseInfo = useCallback(() => {
+    setInfoModalOpen(false);
   }, []);
 
   return (
@@ -243,6 +252,21 @@ const ClickerGame = () => {
             </button>
         </div>
       </div>
+      <FontAwesomeIcon icon={faInfoCircle} className="info-icon" onClick={handleOpenInfo} />
+      {infoModalOpen && (
+        <>
+          <div className="info-overlay" onClick={handleCloseInfo} />
+          <div className="info-modal">
+            <button className="close-button" onClick={handleCloseInfo}>×</button>
+            <h2>
+              <FontAwesomeIcon icon={faInfoCircle} style={{ marginRight: "0.5rem" }} />
+              스텔클릭커 정보
+            </h2>
+            <p>이 사이트는 StelClicker로, 스텔라이브 3기생들을 클릭하는 게임입니다.</p>
+            <p>여러 기능들을 경험해 보세요!</p>
+          </div>
+        </>
+      )}
     </>
   );
 };
