@@ -5,6 +5,7 @@ import { useRive, useStateMachineInput } from "@rive-app/react-canvas";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faChartBar, faChevronUp, faChevronDown, faPaintBrush, faUser, faVolumeUp, faVolumeMute, faInfoCircle } from "@fortawesome/free-solid-svg-icons";
 import "./ClickerGame.css";
+import { useAudioPlayer } from "../hooks/useAudioPlayer";
 
 type Popup = { id: number; top: string; left: string; message: string };
 
@@ -82,45 +83,13 @@ const ClickerGame = () => {
   const isClickingRef = useRef(false);
   const fadeDurations = [1200, 1000, 1800, 1000];  // 캐릭터 별로 다른 fadeout duration (밀리초)
 
-  // 새 오디오 관련 Ref 추가
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const gainNodeRef = useRef<GainNode | null>(null);
-  const audioBuffersRef = useRef<AudioBuffer[]>([]);
+  // 새 커스텀 훅 사용
+  const { playSound } = useAudioPlayer(soundEnabled, fadeDurations, CHAR_SOUNDS);
 
   // clickCounts 로컬 저장
   useEffect(() => {
     localStorage.setItem("clickCounts", JSON.stringify(clickCounts));
   }, [clickCounts]);
-
-  // 오디오 초기화 및 미리 로드
-  useEffect(() => {
-    const initAudio = async () => {
-      try {
-        audioContextRef.current = new AudioContext();
-        gainNodeRef.current = audioContextRef.current.createGain();
-        gainNodeRef.current.connect(audioContextRef.current.destination);
-
-        const buffers = await Promise.all(
-          CHAR_SOUNDS.map(async (url) => {
-            const response = await fetch(url);
-            const arrayBuffer = await response.arrayBuffer();
-            return audioContextRef.current!.decodeAudioData(arrayBuffer);
-          })
-        );
-        audioBuffersRef.current = buffers;
-      } catch (error) {
-        console.error("Audio initialization failed:", error);
-      }
-    };
-
-    if (typeof window !== "undefined") {
-      initAudio();
-    }
-
-    return () => {
-      audioContextRef.current?.close();
-    };
-  }, []);
 
   useEffect(() => {
     document.body.style.backgroundColor = CHAR_COLORS[numberValue];
@@ -141,40 +110,6 @@ const ClickerGame = () => {
     }
   }, [numberValue, numberInput]);
 
-  // 사운드 재생 함수 (fade out 포함)
-  const playSound = useCallback(async (index: number) => {
-    if (!soundEnabled || !audioContextRef.current || !audioBuffersRef.current[index]) return;
-    try {
-      const source = audioContextRef.current.createBufferSource();
-      source.buffer = audioBuffersRef.current[index];
-
-      const gainNode = audioContextRef.current.createGain();
-      source.connect(gainNode);
-      gainNode.connect(audioContextRef.current.destination);
-
-      if (audioContextRef.current.state === "suspended") {
-        await audioContextRef.current.resume();
-      }
-
-      gainNode.gain.setValueAtTime(1, audioContextRef.current.currentTime);
-      source.start(0);
-
-      const fadeDuration = fadeDurations[index] / 1000;
-      gainNode.gain.exponentialRampToValueAtTime(
-        0.001,
-        audioContextRef.current.currentTime + fadeDuration
-      );
-
-      setTimeout(() => {
-        source.stop();
-        source.disconnect();
-        gainNode.disconnect();
-      }, fadeDuration * 1000);
-    } catch (error) {
-      console.error("Sound playback error:", error);
-    }
-  }, [soundEnabled, fadeDurations]);
-
   const handleInteraction = (e: React.PointerEvent) => {
     e.preventDefault();
     if (isClickingRef.current) return;
@@ -182,7 +117,7 @@ const ClickerGame = () => {
       isClickingRef.current = true;
       triggerInput.fire();
       
-      // 오디오 재생을 playSound로 대체
+      // 오디오 재생: 커스텀 훅의 playSound 사용
       playSound(numberValue);
 
       setClickCounts(prev => ({ ...prev, [numberValue]: (prev[numberValue] || 0) + 1 }));
@@ -292,7 +227,6 @@ const ClickerGame = () => {
       </div>
 
       <div className="container game-container">
-        {/* 추가: 캐릭터 이름 표시 */}
         <div className="character-name">{CHAR_NAMES[numberValue]}</div>
         <div className="clickCounter" style={animateCount ? { transform: `scale(1.2) rotate(${rotateAngle}deg)` } : {}}>
           {clickCounts[numberValue] || 0}
