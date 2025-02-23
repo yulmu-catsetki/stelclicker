@@ -3,7 +3,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start; /* 중앙에서 약간 위쪽으로 */
+  padding-top: 40px; /* 위쪽 여백 추가 */
   min-height: 100vh;
   margin: 0 auto;
   text-align: center;
@@ -37,8 +38,9 @@
 /* popup 스타일 및 애니메이션 */
 .popup {
   position: absolute;
-  font-size: 2rem; /* 확대된 폰트 크기 */
+  font-size: 1.6rem; /* 폰트 크기 약간 감소 */
   color: #ffffff;
+  white-space: nowrap; /* 텍스트 줄 바꿈 방지 */
   pointer-events: none;
   animation: popupAnimate 0.5s ease-out forwards;
   user-select: none;
@@ -90,24 +92,62 @@
 
 .stats-panel {
   position: fixed;
-  top: 10px;
-  left: 10px;
-  background: rgba(0, 0, 0, 0.6);
-  padding: 10px;
-  border-radius: 8px;
+  top: 5px;
+  left: 5px;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 5px;
+  border-radius: 6px;
   color: #fff;
   z-index: 1000;
-  font-size: 1rem;
-  line-height: 1.5;
+  font-size: 0.9rem;
+  line-height: 1.2;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 3px;
+}
+
+.stats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.toggle-stats-button {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
 }
 
 .stats-panel div {
+  width: auto;
+  min-width: 80px;
+  padding: 0 3px;
   display: flex;
   justify-content: space-between;
-  width: 150px;
+}
+
+/* 추가: reset-button 스타일 */
+.reset-button {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+/* 모바일 대응 */
+@media (max-width: 600px) {
+  .stats-panel {
+    font-size: 0.8rem;
+    padding: 4px;
+  }
+  .stats-panel div {
+    width: 110px;
+  }
 }
 
 .game-container {
@@ -115,4 +155,5 @@
   /* 화면 전체 높이 사용 */
   height: 100vh;
   margin-top: 0;
+  padding-top: 60px;
 }
