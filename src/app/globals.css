@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: "MyCustomFont";
+  src: url("/asset/fonts/온글잎 박다현체.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -20,10 +27,16 @@ html, body {
   margin: 0;
   padding: 0;
   overflow: hidden;
+  transition: filter 0.5s ease; /* 추가: 필터 전환 효과 */
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "MyCustomFont", Arial, Helvetica, sans-serif;
+}
+
+/* 추가: 클릭 시 밝아지도록 하는 클래스 */
+body.brighten {
+  filter: brightness(1.1);
 }
