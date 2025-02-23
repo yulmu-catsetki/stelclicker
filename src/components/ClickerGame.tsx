@@ -82,7 +82,7 @@ const ClickerGame = () => {
   const fadeDurations = [1200, 1000, 1800, 1000];  // 캐릭터 별로 다른 fadeout duration (밀리초)
 
   // 새 커스텀 훅 사용
-  const { playSound } = useAudioPlayer(soundEnabled, fadeDurations, CHAR_SOUNDS);
+  const { playSound, initializeAudio } = useAudioPlayer(soundEnabled, fadeDurations, CHAR_SOUNDS);
 
   // clickCounts 로컬 저장
   useEffect(() => {
@@ -108,18 +108,14 @@ const ClickerGame = () => {
     }
   }, [numberValue, numberInput]);
 
-  const handleInteraction = (e: React.PointerEvent) => {
+  const handleInteraction = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
     if (isClickingRef.current) return;
     if (triggerInput) {
       isClickingRef.current = true;
       triggerInput.fire();
-      
-      // 오디오 재생: 커스텀 훅의 playSound 사용
       playSound(numberValue);
-
       setClickCounts(prev => ({ ...prev, [numberValue]: (prev[numberValue] || 0) + 1 }));
-      // 추가: 현재 클릭 타임스탬프 저장
       clickTimestampsRef.current.push(Date.now());
       setRotateAngle(Math.random() < 0.5 ? 10 : -10);
       setAnimateCount(true);
@@ -133,7 +129,13 @@ const ClickerGame = () => {
       };
       window.addEventListener("pointerup", pointerUpHandler);
     }
-  };
+  }, [playSound, numberValue, triggerInput]);
+
+  // 최초 사용자 상호작용 시 오디오 초기화를 시도한 후 handleInteraction 호출
+  const handleFirstInteraction = useCallback(async (e: React.PointerEvent) => {
+    await initializeAudio();
+    handleInteraction(e);
+  }, [initializeAudio, handleInteraction]);
 
   // SPS (Stel Per Second, 초당 클릭 수) 계산
   useEffect(() => {
@@ -267,7 +269,7 @@ const ClickerGame = () => {
           ))}
         </div>
         <div className="riveContainer">
-          <RiveComponent onPointerDown={handleInteraction} />
+          <RiveComponent onPointerDown={handleFirstInteraction} />
           {popups.map(popup => (
             <span
               key={popup.id}

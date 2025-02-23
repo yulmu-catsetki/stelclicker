@@ -8,29 +8,25 @@ export function useAudioPlayer(
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioBuffersRef = useRef<AudioBuffer[]>([]);
   const currentAudioSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const isInitializedRef = useRef(false);
 
-  // 오디오 초기화 및 버퍼 로드
-  useEffect(() => {
-    const initAudio = async () => {
-      try {
-        audioContextRef.current = new AudioContext();
-        const buffers = await Promise.all(
-          charSounds.map(async (url) => {
-            const response = await fetch(url);
-            const arrayBuffer = await response.arrayBuffer();
-            return audioContextRef.current!.decodeAudioData(arrayBuffer);
-          })
-        );
-        audioBuffersRef.current = buffers;
-      } catch (error) {
-        console.error("Audio initialization failed:", error);
-      }
-    };
-    initAudio();
-    return () => {
-      audioContextRef.current?.close();
-    };
-  }, [charSounds]);
+  const initializeAudio = useCallback(async () => {
+    if (isInitializedRef.current || !soundEnabled) return;
+    try {
+      audioContextRef.current = new AudioContext();
+      const buffers = await Promise.all(
+        charSounds.map(async (url) => {
+          const response = await fetch(url);
+          const arrayBuffer = await response.arrayBuffer();
+          return audioContextRef.current!.decodeAudioData(arrayBuffer);
+        })
+      );
+      audioBuffersRef.current = buffers;
+      isInitializedRef.current = true;
+    } catch (error) {
+      console.error("Audio initialization failed:", error);
+    }
+  }, [charSounds, soundEnabled]);
 
   useEffect(() => {
     const handleFocus = async () => {
@@ -51,49 +47,39 @@ export function useAudioPlayer(
 
   const playSound = useCallback(
     async (index: number) => {
-      if (
-        !soundEnabled ||
-        !audioContextRef.current ||
-        !audioBuffersRef.current[index]
-      )
-        return;
+      if (!soundEnabled || !isInitializedRef.current) return;
       try {
+        if (audioContextRef.current?.state === "suspended") {
+          await audioContextRef.current.resume();
+        }
         if (currentAudioSourceRef.current) {
           currentAudioSourceRef.current.stop();
           currentAudioSourceRef.current.disconnect();
           currentAudioSourceRef.current = null;
         }
-        const source = audioContextRef.current.createBufferSource();
+        const source = audioContextRef.current!.createBufferSource();
         source.buffer = audioBuffersRef.current[index];
         currentAudioSourceRef.current = source;
-        const localSource = source;
-
-        const gainNode = audioContextRef.current.createGain();
+        const gainNode = audioContextRef.current!.createGain();
         source.connect(gainNode);
-        gainNode.connect(audioContextRef.current.destination);
+        gainNode.connect(audioContextRef.current!.destination);
 
-        if (audioContextRef.current.state === "suspended") {
-          await audioContextRef.current.resume();
-        }
-
-        gainNode.gain.setValueAtTime(1, audioContextRef.current.currentTime);
+        gainNode.gain.setValueAtTime(0.001, audioContextRef.current!.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(
+          1,
+          audioContextRef.current!.currentTime + 0.1
+        );
         source.start(0);
-
         const fadeDuration = fadeDurations[index] / 1000;
-        if (currentAudioSourceRef.current !== localSource) return;
-
         gainNode.gain.linearRampToValueAtTime(
           0,
-          audioContextRef.current.currentTime + fadeDuration * 1.2
+          audioContextRef.current!.currentTime + fadeDuration * 1.2
         );
-
         setTimeout(() => {
-          if (currentAudioSourceRef.current === localSource) {
-            source.stop();
-            source.disconnect();
-            gainNode.disconnect();
-            currentAudioSourceRef.current = null;
-          }
+          source.stop();
+          source.disconnect();
+          gainNode.disconnect();
+          currentAudioSourceRef.current = null;
         }, fadeDuration * 1.2 * 1000);
       } catch (error) {
         console.error("Sound playback error:", error);
@@ -102,5 +88,5 @@ export function useAudioPlayer(
     [soundEnabled, fadeDurations]
   );
 
-  return { playSound };
+  return { playSound, initializeAudio };
 }
