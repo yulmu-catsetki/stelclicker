@@ -71,7 +71,7 @@ export function useAudioPlayer(
         source.connect(gainNode);
         gainNode.connect(audioContextRef.current!.destination);
 
-        const volumeFactor = volume / 200; // 볼륨 조절
+        const volumeFactor = 0.1 * Math.pow(volume / 100, 1.4); // 볼륨 조절
         gainNode.gain.setValueAtTime(0.001, audioContextRef.current!.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(
           volumeFactor,
