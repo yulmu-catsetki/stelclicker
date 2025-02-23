@@ -7,7 +7,30 @@ import { faChartBar, faChevronUp, faChevronDown, faPaintBrush, faUser, faVolumeU
 import "./ClickerGame.css";
 import { useAudioPlayer } from "../hooks/useAudioPlayer";
 
+const GAME_VERSION = "0.17.1";
+const CHAR_NAMES = ["텐코 시부키", "하나코 나나", "유즈하 리코", "아오쿠모 린"];
+const CHAR_SOUNDS = [
+  "/asset/shibuki/debakbak.mp3",
+  "/asset/shibuki/gomapdei.mp3",
+  "/asset/shibuki/hiyongsa.mp3",
+  "/asset/shibuki/nyo.mp3",
+];
+const CHAR_COLORS = ["#C2AFE6", "#DF7685", "#A6D0A6", "#2B66C0"];
+const CHAR_POPUP_MESSAGES = ["+대박박", "+고맙데이", "+하이용사", "+뇨!"];
+const SPECIAL_THRESHOLDS: { [key: number]: number[] } = {
+  0: [1000, 2000, 3000], // 텐코 시부키
+  1: [1000, 2000, 3000], // 하나코 나나
+  2: [1000, 2000, 3000], // 유즈하 리코
+  3: [1000, 2000, 3000] // 아오쿠모 린
+};
 type Popup = { id: number; top: string; left: string; message: string };
+
+function adjustColor(hex: string, factor: number): string {
+  const r = Math.min(255, Math.floor(parseInt(hex.slice(1,3), 16) * factor));
+  const g = Math.min(255, Math.floor(parseInt(hex.slice(3,5), 16) * factor));
+  const b = Math.min(255, Math.floor(parseInt(hex.slice(5,7), 16) * factor));
+  return "#" + [r, g, b].map(c => c.toString(16).padStart(2, "0")).join("");
+}
 
 const getRandomPopupPosition = (): { top: string; left: string } => {
   const sides = ["top", "bottom", "left", "right"];
@@ -28,29 +51,6 @@ const getRandomPopupPosition = (): { top: string; left: string } => {
   }
   return { top, left };
 };
-
-const CHAR_NAMES = ["텐코 시부키", "하나코 나나", "유즈하 리코", "아오쿠모 린"];
-const CHAR_SOUNDS = [
-  "/asset/shibuki/debakbak.mp3",
-  "/asset/shibuki/gomapdei.mp3",
-  "/asset/shibuki/hiyongsa.mp3",
-  "/asset/shibuki/nyo.mp3",
-];
-const CHAR_COLORS = ["#C2AFE6", "#DF7685", "#A6D0A6", "#2B66C0"];
-const CHAR_POPUP_MESSAGES = ["+대박박", "+고맙데이", "+하이용사", "+뇨!"];
-const SPECIAL_THRESHOLDS: { [key: number]: number[] } = {
-  0: [1000, 2000, 3000], // 텐코 시부키
-  1: [1000, 2000, 3000], // 하나코 나나
-  2: [1000, 2000, 3000], // 유즈하 리코
-  3: [1000, 2000, 3000] // 아오쿠모 린
-};
-
-function adjustColor(hex: string, factor: number): string {
-  const r = Math.min(255, Math.floor(parseInt(hex.slice(1,3), 16) * factor));
-  const g = Math.min(255, Math.floor(parseInt(hex.slice(3,5), 16) * factor));
-  const b = Math.min(255, Math.floor(parseInt(hex.slice(5,7), 16) * factor));
-  return "#" + [r, g, b].map(c => c.toString(16).padStart(2, "0")).join("");
-}
 
 const ClickerGame = () => {
   const [clickCounts, setClickCounts] = useState<{ [key: number]: number }>(() => {
@@ -315,8 +315,9 @@ const ClickerGame = () => {
               <FontAwesomeIcon icon={faInfoCircle} style={{ marginRight: "0.5rem" }} />
               스텔클릭커 정보
             </h2>
-            <p>이 사이트는 StelClicker로, 스텔라이브 3기생들을 클릭하는 게임입니다.</p>
+            <p>스텔라이브 3기생들을 클릭하는 게임입니다.</p>
             <p>여러 기능들을 경험해 보세요!</p>
+            <p>버전 {GAME_VERSION}</p>
           </div>
         </>
       )}
