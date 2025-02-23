@@ -3,15 +3,15 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start; /* 중앙에서 약간 위쪽으로 */
-  padding-top: 40px; /* 위쪽 여백 추가 */
+  justify-content: flex-start;
+  padding-top: 40px;
   min-height: 100vh;
   margin: 0 auto;
   text-align: center;
 }
 
 .clickCounter {
-  font-size: 3rem; /* 변경된 폰트 크기 */
+  font-size: 3rem;
   font-weight: bold;
   margin-bottom: 2rem;
   color: #ffffff;
@@ -38,7 +38,7 @@
 /* popup 스타일 및 애니메이션 */
 .popup {
   position: absolute;
-  font-size: 1.6rem; /* 폰트 크기 약간 감소 */
+  font-size: 1.6rem;
   color: #ffffff;
   white-space: nowrap; /* 텍스트 줄 바꿈 방지 */
   pointer-events: none;
@@ -74,6 +74,7 @@
   transition: background-color 0.3s ease;
   border: none;
   user-select: none;
+  font-size: 1.1rem;
 }
 
 .buttonSkin {
@@ -99,7 +100,7 @@
   border-radius: 6px;
   color: #fff;
   z-index: 1000;
-  font-size: 0.9rem;
+  font-size: 1rem;
   line-height: 1.2;
   display: flex;
   flex-direction: column;
@@ -128,7 +129,6 @@
   justify-content: space-between;
 }
 
-/* 추가: reset-button 스타일 */
 .reset-button {
   background: transparent;
   border: none;
