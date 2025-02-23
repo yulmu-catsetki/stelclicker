@@ -14,6 +14,14 @@
   }
 }
 
+/* 본문과 html에 높이, 스크롤 비활성화 */
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
 body {
   color: var(--foreground);
   background: var(--background);
