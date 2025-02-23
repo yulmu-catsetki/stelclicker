@@ -13,7 +13,6 @@
 .clickCounter {
   font-size: 3rem;
   font-weight: bold;
-  margin-bottom: 2rem;
   color: #ffffff;
   transition: transform 0.3s ease-in-out, color 0.3s ease-in-out;
   user-select: none;
@@ -96,7 +95,7 @@
   border: none;
   padding: 0;
   cursor: pointer;
-  font-size: 1.7rem; /* 통일된 크기로 조정 */
+  font-size: 1.7rem;
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -188,7 +187,7 @@
   /* 화면 전체 높이 사용 */
   height: 100vh;
   margin-top: 0;
-  padding-top: 60px;
+  padding-top: 20px;
 }
 
 /* 추가: 정보 버튼 */

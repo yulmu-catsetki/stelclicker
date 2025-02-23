@@ -37,6 +37,12 @@ const CHAR_SOUNDS = [
 ];
 const CHAR_COLORS = ["#C2AFE6", "#DF7685", "#A6D0A6", "#2B66C0"];
 const CHAR_POPUP_MESSAGES = ["+대박박", "+고맙데이", "+하이용사", "+뇨!"];
+const SPECIAL_THRESHOLDS: { [key: number]: number[] } = {
+  0: [1000, 2000, 3000], // 텐코 시부키
+  1: [1000, 2000, 3000], // 하나코 나나
+  2: [1000, 2000, 3000], // 유즈하 리코
+  3: [1000, 2000, 3000] // 아오쿠모 린
+};
 
 const darken = (hex: string, factor = 0.7) => {
   const r = parseInt(hex.slice(1,3), 16);
@@ -56,7 +62,13 @@ const ClickerGame = () => {
     }
     return { 0: 0, 1: 0, 2: 0, 3: 0 };
   });
-  const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
+  //캐릭터 인덱스별로 도달한 임계값(배열) 저장
+  const [specialTriggered, setSpecialTriggered] = useState<{ [key: number]: number[] }>({
+    0: [],
+    1: [],
+    2: [],
+    3: [],
+  });
   const [animateCount, setAnimateCount] = useState(false);
   const [rotateAngle, setRotateAngle] = useState(0);
   const [popups, setPopups] = useState<Popup[]>([]);
@@ -67,44 +79,51 @@ const ClickerGame = () => {
   const [infoModalOpen, setInfoModalOpen] = useState(false);
 
   const clickTimestampsRef = useRef<number[]>([]);
-  const fadeOutIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isClickingRef = useRef(false);
   const fadeDurations = [1200, 1000, 1800, 1000];  // 캐릭터 별로 다른 fadeout duration (밀리초)
+
+  // 새 오디오 관련 Ref 추가
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
+  const audioBuffersRef = useRef<AudioBuffer[]>([]);
 
   // clickCounts 로컬 저장
   useEffect(() => {
     localStorage.setItem("clickCounts", JSON.stringify(clickCounts));
   }, [clickCounts]);
 
-  // 오디오 페이드아웃 함수
-  const fadeOutAudio = useCallback((audio: HTMLAudioElement, duration = 1200) => {
-    if (fadeOutIntervalRef.current) {
-      clearInterval(fadeOutIntervalRef.current);
-      fadeOutIntervalRef.current = null;
-    }
-    const steps = 20, stepTime = duration / steps, fadeStep = audio.volume / steps;
-    fadeOutIntervalRef.current = setInterval(() => {
-      if (audio.volume > fadeStep) {
-        audio.volume = Math.max(0, audio.volume - fadeStep);
-      } else {
-        audio.volume = 0;
-        clearInterval(fadeOutIntervalRef.current!);
-        fadeOutIntervalRef.current = null;
-        audio.pause();
-        audio.currentTime = 0;
-        audio.volume = 1;
+  // 오디오 초기화 및 미리 로드
+  useEffect(() => {
+    const initAudio = async () => {
+      try {
+        audioContextRef.current = new AudioContext();
+        gainNodeRef.current = audioContextRef.current.createGain();
+        gainNodeRef.current.connect(audioContextRef.current.destination);
+
+        const buffers = await Promise.all(
+          CHAR_SOUNDS.map(async (url) => {
+            const response = await fetch(url);
+            const arrayBuffer = await response.arrayBuffer();
+            return audioContextRef.current!.decodeAudioData(arrayBuffer);
+          })
+        );
+        audioBuffersRef.current = buffers;
+      } catch (error) {
+        console.error("Audio initialization failed:", error);
       }
-    }, stepTime);
+    };
+
+    if (typeof window !== "undefined") {
+      initAudio();
+    }
+
+    return () => {
+      audioContextRef.current?.close();
+    };
   }, []);
 
   useEffect(() => {
     document.body.style.backgroundColor = CHAR_COLORS[numberValue];
-  }, [numberValue]);
-
-  useEffect(() => {
-    const audioEl = new Audio(CHAR_SOUNDS[numberValue]);
-    audioEl.preload = "auto";
-    setAudio(audioEl);
   }, [numberValue]);
 
   const { rive, RiveComponent } = useRive({
@@ -122,27 +141,50 @@ const ClickerGame = () => {
     }
   }, [numberValue, numberInput]);
 
+  // 사운드 재생 함수 (fade out 포함)
+  const playSound = useCallback(async (index: number) => {
+    if (!soundEnabled || !audioContextRef.current || !audioBuffersRef.current[index]) return;
+    try {
+      const source = audioContextRef.current.createBufferSource();
+      source.buffer = audioBuffersRef.current[index];
+
+      const gainNode = audioContextRef.current.createGain();
+      source.connect(gainNode);
+      gainNode.connect(audioContextRef.current.destination);
+
+      if (audioContextRef.current.state === "suspended") {
+        await audioContextRef.current.resume();
+      }
+
+      gainNode.gain.setValueAtTime(1, audioContextRef.current.currentTime);
+      source.start(0);
+
+      const fadeDuration = fadeDurations[index] / 1000;
+      gainNode.gain.exponentialRampToValueAtTime(
+        0.001,
+        audioContextRef.current.currentTime + fadeDuration
+      );
+
+      setTimeout(() => {
+        source.stop();
+        source.disconnect();
+        gainNode.disconnect();
+      }, fadeDuration * 1000);
+    } catch (error) {
+      console.error("Sound playback error:", error);
+    }
+  }, [soundEnabled, fadeDurations]);
+
   const handleInteraction = (e: React.PointerEvent) => {
     e.preventDefault();
     if (isClickingRef.current) return;
     if (triggerInput) {
       isClickingRef.current = true;
       triggerInput.fire();
-      if (audio && soundEnabled) { // soundEnabled에 따라 실행
-        if (window.AudioContext) {
-          const ctx = new AudioContext();
-          if (ctx.state === "suspended") ctx.resume();
-        }
-        if (fadeOutIntervalRef.current) {
-          clearInterval(fadeOutIntervalRef.current);
-          fadeOutIntervalRef.current = null;
-        }
-        audio.volume = 1;
-        audio.currentTime = 0;
-        audio.play().catch(err => console.error("Error playing audio:", err));
-        // 전달하는 fadeout duration을 캐릭터별로 다르게 설정
-        fadeOutAudio(audio, fadeDurations[numberValue]);
-      }
+      
+      // 오디오 재생을 playSound로 대체
+      playSound(numberValue);
+
       setClickCounts(prev => ({ ...prev, [numberValue]: (prev[numberValue] || 0) + 1 }));
       // 추가: 현재 클릭 타임스탬프 저장
       clickTimestampsRef.current.push(Date.now());
@@ -170,6 +212,21 @@ const ClickerGame = () => {
     }, 200);
     return () => clearInterval(interval);
   }, []);
+
+  // 클릭 수 변경 시 모든 임계값 체크
+  useEffect(() => {
+    const currentCount = clickCounts[numberValue] || 0;
+    const thresholds = SPECIAL_THRESHOLDS[numberValue] || [];
+    thresholds.forEach(threshold => {
+      if (currentCount >= threshold && !specialTriggered[numberValue].includes(threshold)) {
+        console.log(`${CHAR_NAMES[numberValue]}: 특수 이벤트 발생! (${threshold} 만큼 클릭)`);
+        setSpecialTriggered(prev => ({
+          ...prev,
+          [numberValue]: [...prev[numberValue], threshold],
+        }));
+      }
+    });
+  }, [clickCounts, numberValue, specialTriggered]);
 
   const handleSkinChange = useCallback(() => {
     // console.log("Change Skin 버튼 클릭"); // 제거
