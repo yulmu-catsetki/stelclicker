@@ -229,7 +229,8 @@
   border-radius: 0.5rem;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   z-index: 1200;
-  max-width: 90%;
+  width: 500px;
+  max-width: 95%;
   color: black;
 }
 
