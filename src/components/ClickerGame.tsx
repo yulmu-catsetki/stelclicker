@@ -7,7 +7,7 @@ import { faChartBar, faChevronUp, faChevronDown, faPaintBrush, faUser, faVolumeU
 import "./ClickerGame.css";
 import { useAudioPlayer } from "../hooks/useAudioPlayer";
 
-const GAME_VERSION = "0.18.0";
+const GAME_VERSION = "0.18.1";
 const CHAR_NAMES = ["텐코 시부키", "하나코 나나", "유즈하 리코", "아오쿠모 린"];
 const CHAR_SOUNDS = [
   "/asset/shibuki/debakbak.mp3",
@@ -346,7 +346,7 @@ const ClickerGame = () => {
             <p>스텔라이브 3기생들을 클릭하는 게임입니다.</p>
             <p>여러 기능들을 경험해 보세요!</p>
             <p>버전 {GAME_VERSION}</p>
-            <p># 볼륨 조절 기능 추가, 린은 아직 추가되지 않았습니다.</p>
+            <p># 전반적 볼륨 감소, 린은 아직 추가되지 않았습니다.</p>
           </div>
         </>
       )}
