@@ -61,8 +61,8 @@
   display: flex;
   margin-top: 2rem;
   gap: 1rem;
-  flex-wrap: wrap; /* 모바일 대응: 줄바꿈 허용 */
-  justify-content: center; /* 중앙 정렬 */
+  flex-wrap: wrap; /* 반응형 대응 */
+  justify-content: center;
 }
 
 .buttonSkin,
@@ -89,6 +89,23 @@
 }
 .buttonCharacter:hover {
   background-color: #059669;
+}
+
+.buttonInfo {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 1.7rem; /* 통일된 크기로 조정 */
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.3s ease;
+}
+
+.buttonInfo:hover {
+  color: #e0e0e0;
 }
 
 .stats-panel {
@@ -191,16 +208,6 @@
   justify-content: center;
 }
 
-.info-icon {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  z-index: 1200;
-  font-size: 2rem; /* 필요에 따라 조정 */
-  color: #3B82F6;  /* 아이콘 색상 */
-  cursor: pointer;
-}
-
 /* 모달 백그라운드 오버레이 */
 .info-overlay {
   position: fixed;
@@ -235,4 +242,14 @@
   border: none;
   font-size: 1.2rem;
   cursor: pointer;
+}
+
+.buttonToggleSound {
+  transform: translateY(2px);
+}
+
+.character-name {
+  font-size: 1.4rem;
+  color: #ffffff;
+  margin-bottom: 0.2rem;
 }
