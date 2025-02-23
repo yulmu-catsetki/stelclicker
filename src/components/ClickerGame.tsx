@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useRive, useStateMachineInput } from "@rive-app/react-canvas";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faChartBar, faChevronUp, faChevronDown, faPaintBrush, faUser } from "@fortawesome/free-solid-svg-icons";
+import { faChartBar, faChevronUp, faChevronDown, faPaintBrush, faUser, faVolumeUp, faVolumeMute } from "@fortawesome/free-solid-svg-icons";
 import "./ClickerGame.css";
 
 type Popup = { id: number; top: string; left: string; message: string };
@@ -35,7 +35,7 @@ const CHAR_SOUNDS = [
   "/asset/shibuki/nyo.mp3",
 ];
 const CHAR_COLORS = ["#C2AFE6", "#DF7685", "#A6D0A6", "#2B66C0"];
-const CHAR_POPUP_MESSAGES = ["+대박박", "+고맙데이", "+최고야!", "+쩌네!"];
+const CHAR_POPUP_MESSAGES = ["+대박박", "+고맙데이", "+하이용사", "+뇨!"];
 
 const ClickerGame = () => {
   const [clickCounts, setClickCounts] = useState<{ [key: number]: number }>(() => {
@@ -51,12 +51,13 @@ const ClickerGame = () => {
   const [popups, setPopups] = useState<Popup[]>([]);
   const [numberValue, setNumberValue] = useState<number>(() => Math.floor(Math.random() * 4)); // 변경된 초기값
   const [statsOpen, setStatsOpen] = useState(true);
-
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [avgSps, setAvgSps] = useState(0);
+  
+  const clickTimestampsRef = useRef<number[]>([]);
   const fadeOutIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isClickingRef = useRef(false);
-
-  // 캐릭터 별로 다른 fadeout duration (밀리초)
-  const fadeDurations = [1200, 1000, 1500, 1000];
+  const fadeDurations = [1200, 1000, 1800, 1000];  // 캐릭터 별로 다른 fadeout duration (밀리초)
 
   // clickCounts 로컬 저장
   useEffect(() => {
@@ -115,7 +116,7 @@ const ClickerGame = () => {
     if (triggerInput) {
       isClickingRef.current = true;
       triggerInput.fire();
-      if (audio) {
+      if (audio && soundEnabled) { // soundEnabled에 따라 실행
         if (window.AudioContext) {
           const ctx = new AudioContext();
           if (ctx.state === "suspended") ctx.resume();
@@ -131,6 +132,8 @@ const ClickerGame = () => {
         fadeOutAudio(audio, fadeDurations[numberValue]);
       }
       setClickCounts(prev => ({ ...prev, [numberValue]: (prev[numberValue] || 0) + 1 }));
+      // 추가: 현재 클릭 타임스탬프 저장
+      clickTimestampsRef.current.push(Date.now());
       setRotateAngle(Math.random() < 0.5 ? 10 : -10);
       setAnimateCount(true);
       setTimeout(() => setAnimateCount(false), 300);
@@ -144,6 +147,17 @@ const ClickerGame = () => {
       window.addEventListener("pointerup", pointerUpHandler);
     }
   };
+
+  // SPS 업데이트 (100ms마다 지난 1초 클릭수 계산)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      clickTimestampsRef.current = clickTimestampsRef.current.filter(ts => now - ts <= 1000); // 최근 1초 클릭 수 계산
+      const currentSps = clickTimestampsRef.current.length;
+      setAvgSps(prev => prev * 0.9 + currentSps * 0.1); // 지수 가중 이동 평균 계산 (0.9, 0.1은 가중치)
+    }, 100);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleChangeSkin = useCallback(() => {
     console.log("Change Skin 버튼 클릭");
@@ -159,8 +173,15 @@ const ClickerGame = () => {
     }
   }, []);
 
+  const handleToggleSound = useCallback(() => {
+    setSoundEnabled(prev => !prev);
+  }, []);
+
   return (
     <>
+      <div className="sps-panel">
+        <div>SPS: {avgSps.toFixed(1)}</div>
+      </div>
       <div className="stats-panel">
         <div className="stats-header">
             <div style={{ fontWeight: "bold" }}>
@@ -217,6 +238,9 @@ const ClickerGame = () => {
           <button className="buttonCharacter" onClick={handleChangeCharacter}>
             <FontAwesomeIcon icon={faUser} /> 캐릭터 변경
           </button>
+            <button className="buttonToggleSound" onClick={handleToggleSound}>
+              <FontAwesomeIcon icon={soundEnabled ? faVolumeUp : faVolumeMute} />
+            </button>
         </div>
       </div>
     </>

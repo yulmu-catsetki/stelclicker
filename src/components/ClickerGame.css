@@ -107,6 +107,22 @@
   gap: 3px;
 }
 
+/* SPS 패널 */
+.sps-panel {
+  position: fixed;
+  top: 5px;
+  right: 5px;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 5px;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 1rem;
+  line-height: 1.2;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
 .stats-header {
   display: flex;
   justify-content: space-between;
