@@ -45,15 +45,12 @@ const SPECIAL_THRESHOLDS: { [key: number]: number[] } = {
   3: [1000, 2000, 3000] // 아오쿠모 린
 };
 
-const darken = (hex: string, factor = 0.7) => {
-  const r = parseInt(hex.slice(1,3), 16);
-  const g = parseInt(hex.slice(3,5), 16);
-  const b = parseInt(hex.slice(5,7), 16);
-  const nr = Math.floor(r * factor);
-  const ng = Math.floor(g * factor);
-  const nb = Math.floor(b * factor);
-  return '#' + [nr, ng, nb].map(x => x.toString(16).padStart(2, '0')).join('');
-};
+function adjustColor(hex: string, factor: number): string {
+  const r = Math.min(255, Math.floor(parseInt(hex.slice(1,3), 16) * factor));
+  const g = Math.min(255, Math.floor(parseInt(hex.slice(3,5), 16) * factor));
+  const b = Math.min(255, Math.floor(parseInt(hex.slice(5,7), 16) * factor));
+  return "#" + [r, g, b].map(c => c.toString(16).padStart(2, "0")).join("");
+}
 
 const ClickerGame = () => {
   const [clickCounts, setClickCounts] = useState<{ [key: number]: number }>(() => {
@@ -78,6 +75,7 @@ const ClickerGame = () => {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [avgSps, setAvgSps] = useState(0);
   const [infoModalOpen, setInfoModalOpen] = useState(false);
+  const [fireworks, setFireworks] = useState<{ id: number; particles: { dx: number; dy: number }[] }[]>([]);
 
   const clickTimestampsRef = useRef<number[]>([]);
   const isClickingRef = useRef(false);
@@ -153,12 +151,19 @@ const ClickerGame = () => {
     const currentCount = clickCounts[numberValue] || 0;
     const thresholds = SPECIAL_THRESHOLDS[numberValue] || [];
     thresholds.forEach(threshold => {
-      if (currentCount >= threshold && !specialTriggered[numberValue].includes(threshold)) {
+      if (currentCount === threshold && !specialTriggered[numberValue].includes(threshold)) {
         console.log(`${CHAR_NAMES[numberValue]}: 특수 이벤트 발생! (${threshold} 만큼 클릭)`);
         setSpecialTriggered(prev => ({
           ...prev,
           [numberValue]: [...prev[numberValue], threshold],
         }));
+        // 각 입자는 랜덤 각도와 속도(80~150px)를 계산
+        const particles = Array.from({ length: 8 }, () => {
+          const angleRad = Math.random() * 2 * Math.PI;
+          const speed = 80 + Math.random() * 70;
+          return { dx: Math.cos(angleRad) * speed, dy: Math.sin(angleRad) * speed };
+        });
+        setFireworks(prev => [...prev, { id: Date.now(), particles }]);
       }
     });
   }, [clickCounts, numberValue, specialTriggered]);
@@ -199,7 +204,9 @@ const ClickerGame = () => {
             <div style={{ fontWeight: "bold" }}>
             <FontAwesomeIcon icon={faChartBar} />클릭 통계
             </div>
-          <button className="toggle-stats-button" onClick={() => setStatsOpen(prev => !prev)}>
+          <button className="toggle-stats-button" 
+            onClick={() => setStatsOpen(prev => !prev)}
+            aria-label="통계 토글">
             <FontAwesomeIcon icon={statsOpen ? faChevronUp : faChevronDown} />
           </button>
         </div>
@@ -228,8 +235,36 @@ const ClickerGame = () => {
 
       <div className="container game-container">
         <div className="character-name">{CHAR_NAMES[numberValue]}</div>
-        <div className="clickCounter" style={animateCount ? { transform: `scale(1.2) rotate(${rotateAngle}deg)` } : {}}>
-          {clickCounts[numberValue] || 0}
+        <div className="clickCounterWrapper" style={{ position: "relative", display: "inline-block" }}>
+          <div className="clickCounter" style={animateCount ? { transform: `scale(1.2) rotate(${rotateAngle}deg)` } : {}}>
+            {clickCounts[numberValue] || 0}
+          </div>
+          {fireworks.map(fw => (
+            <div
+              key={fw.id}
+              className="fireworks-container"
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: "100%",
+                "--bright-color": adjustColor(CHAR_COLORS[numberValue], 1.3)
+              } as React.CSSProperties}
+              onAnimationEnd={() => setFireworks(old => old.filter(f => f.id !== fw.id))}
+            >
+              {fw.particles.map((p, idx) => (
+                <span
+                  key={idx}
+                  className="firework"
+                  style={{
+                    "--dx": `${p.dx}px`,
+                    "--dy": `${p.dy}px`
+                  } as React.CSSProperties}
+                />
+              ))}
+            </div>
+          ))}
         </div>
         <div className="riveContainer">
           <RiveComponent onPointerDown={handleInteraction} />
@@ -247,18 +282,24 @@ const ClickerGame = () => {
         <div className="buttonContainer">
           <button className="buttonSkin" 
             onClick={handleSkinChange}
-            style={{ backgroundColor: darken(CHAR_COLORS[numberValue]) }}>
+            style={{ backgroundColor: adjustColor(CHAR_COLORS[numberValue], 0.7) }}
+            aria-label="스킨 변경">
             <FontAwesomeIcon icon={faPaintBrush} /> 스킨 변경
           </button>
           <button className="buttonCharacter" 
             onClick={handleChangeCharacter}
-            style={{ backgroundColor: darken(CHAR_COLORS[numberValue]) }}>
+            style={{ backgroundColor: adjustColor(CHAR_COLORS[numberValue], 0.7) }}
+            aria-label="캐릭터 변경">
             <FontAwesomeIcon icon={faUser} /> 캐릭터 변경
           </button>
-          <button className="buttonToggleSound" onClick={handleToggleSound}>
+          <button className="buttonToggleSound" 
+            onClick={handleToggleSound}
+            aria-label="사운드 토글">
             <FontAwesomeIcon icon={soundEnabled ? faVolumeUp : faVolumeMute} />
           </button>
-          <button className="buttonInfo" onClick={handleOpenInfo}>
+          <button className="buttonInfo" 
+            onClick={handleOpenInfo}
+            aria-label="정보 열기">
             <FontAwesomeIcon icon={faInfoCircle} />
           </button>
         </div>
@@ -266,8 +307,8 @@ const ClickerGame = () => {
       {infoModalOpen && (
         <>
           <div className="info-overlay" onClick={handleCloseInfo} />
-          <div className="info-modal">
-            <button className="close-button" onClick={handleCloseInfo}>×</button>
+          <div className="info-modal" role="dialog" aria-modal="true">
+            <button className="close-button" onClick={handleCloseInfo} aria-label="모달 닫기">×</button>
             <h2>
               <FontAwesomeIcon icon={faInfoCircle} style={{ marginRight: "0.5rem" }} />
               스텔클릭커 정보
