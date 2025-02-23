@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useRive, useStateMachineInput } from "@rive-app/react-canvas";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faChevronUp, faChevronDown, faPaintBrush, faUser } from "@fortawesome/free-solid-svg-icons";
+import { faChartBar, faChevronUp, faChevronDown, faPaintBrush, faUser } from "@fortawesome/free-solid-svg-icons";
 import "./ClickerGame.css";
 
 type Popup = { id: number; top: string; left: string; message: string };
@@ -31,8 +31,8 @@ const getRandomPopupPosition = (): { top: string; left: string } => {
 const CHAR_SOUNDS = [
   "/asset/shibuki/debakbak.mp3",
   "/asset/shibuki/gomapdei.mp3",
-  "/asset/shibuki/char2.mp3",
-  "/asset/shibuki/char3.mp3"
+  "/asset/shibuki/hiyongsa.mp3",
+  "/asset/shibuki/nyo.mp3",
 ];
 const CHAR_COLORS = ["#C2AFE6", "#DF7685", "#A6D0A6", "#2B66C0"];
 const CHAR_POPUP_MESSAGES = ["+대박박", "+고맙데이", "+최고야!", "+쩌네!"];
@@ -49,11 +49,14 @@ const ClickerGame = () => {
   const [animateCount, setAnimateCount] = useState(false);
   const [rotateAngle, setRotateAngle] = useState(0);
   const [popups, setPopups] = useState<Popup[]>([]);
-  const [numberValue, setNumberValue] = useState(0);
+  const [numberValue, setNumberValue] = useState<number>(() => Math.floor(Math.random() * 4)); // 변경된 초기값
   const [statsOpen, setStatsOpen] = useState(true);
 
   const fadeOutIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isClickingRef = useRef(false);
+
+  // 캐릭터 별로 다른 fadeout duration (밀리초)
+  const fadeDurations = [1200, 1000, 1500, 1000];
 
   // clickCounts 로컬 저장
   useEffect(() => {
@@ -124,7 +127,8 @@ const ClickerGame = () => {
         audio.volume = 1;
         audio.currentTime = 0;
         audio.play().catch(err => console.error("Error playing audio:", err));
-        fadeOutAudio(audio);
+        // 전달하는 fadeout duration을 캐릭터별로 다르게 설정
+        fadeOutAudio(audio, fadeDurations[numberValue]);
       }
       setClickCounts(prev => ({ ...prev, [numberValue]: (prev[numberValue] || 0) + 1 }));
       setRotateAngle(Math.random() < 0.5 ? 10 : -10);
@@ -159,7 +163,9 @@ const ClickerGame = () => {
     <>
       <div className="stats-panel">
         <div className="stats-header">
-          <div style={{ fontWeight: "bold" }}>클릭 통계</div>
+            <div style={{ fontWeight: "bold" }}>
+            <FontAwesomeIcon icon={faChartBar} />클릭 통계
+            </div>
           <button className="toggle-stats-button" onClick={() => setStatsOpen(prev => !prev)}>
             <FontAwesomeIcon icon={statsOpen ? faChevronUp : faChevronDown} />
           </button>
@@ -167,16 +173,16 @@ const ClickerGame = () => {
         {statsOpen && (
           <>
             <div>
-              <span>시부키:</span> <span>{clickCounts[0] || 0}</span>
+              <span>시부키</span> <span>{clickCounts[0] || 0}</span>
             </div>
             <div>
-              <span>나나:</span> <span>{clickCounts[1] || 0}</span>
+              <span>나나</span> <span>{clickCounts[1] || 0}</span>
             </div>
             <div>
-              <span>리코:</span> <span>{clickCounts[2] || 0}</span>
+              <span>리코</span> <span>{clickCounts[2] || 0}</span>
             </div>
             <div>
-              <span>린:</span> <span>{clickCounts[3] || 0}</span>
+              <span>린</span> <span>{clickCounts[3] || 0}</span>
             </div>
             <div>
               <button className="reset-button" onClick={handleResetStats}>
