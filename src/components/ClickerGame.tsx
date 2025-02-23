@@ -28,6 +28,7 @@ const getRandomPopupPosition = (): { top: string; left: string } => {
   return { top, left };
 };
 
+const CHAR_NAMES = ["텐코 시부키", "하나코 나나", "유즈하 리코", "아오쿠모 린"];
 const CHAR_SOUNDS = [
   "/asset/shibuki/debakbak.mp3",
   "/asset/shibuki/gomapdei.mp3",
@@ -36,6 +37,16 @@ const CHAR_SOUNDS = [
 ];
 const CHAR_COLORS = ["#C2AFE6", "#DF7685", "#A6D0A6", "#2B66C0"];
 const CHAR_POPUP_MESSAGES = ["+대박박", "+고맙데이", "+하이용사", "+뇨!"];
+
+const darken = (hex: string, factor = 0.7) => {
+  const r = parseInt(hex.slice(1,3), 16);
+  const g = parseInt(hex.slice(3,5), 16);
+  const b = parseInt(hex.slice(5,7), 16);
+  const nr = Math.floor(r * factor);
+  const ng = Math.floor(g * factor);
+  const nb = Math.floor(b * factor);
+  return '#' + [nr, ng, nb].map(x => x.toString(16).padStart(2, '0')).join('');
+};
 
 const ClickerGame = () => {
   const [clickCounts, setClickCounts] = useState<{ [key: number]: number }>(() => {
@@ -160,8 +171,8 @@ const ClickerGame = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const handleChangeSkin = useCallback(() => {
-    console.log("Change Skin 버튼 클릭");
+  const handleSkinChange = useCallback(() => {
+    // console.log("Change Skin 버튼 클릭"); // 제거
   }, []);
 
   const handleChangeCharacter = useCallback(() => {
@@ -224,6 +235,8 @@ const ClickerGame = () => {
       </div>
 
       <div className="container game-container">
+        {/* 추가: 캐릭터 이름 표시 */}
+        <div className="character-name">{CHAR_NAMES[numberValue]}</div>
         <div className="clickCounter" style={animateCount ? { transform: `scale(1.2) rotate(${rotateAngle}deg)` } : {}}>
           {clickCounts[numberValue] || 0}
         </div>
@@ -241,18 +254,24 @@ const ClickerGame = () => {
           ))}
         </div>
         <div className="buttonContainer">
-          <button className="buttonSkin" onClick={handleChangeSkin}>
+          <button className="buttonSkin" 
+            onClick={handleSkinChange}
+            style={{ backgroundColor: darken(CHAR_COLORS[numberValue]) }}>
             <FontAwesomeIcon icon={faPaintBrush} /> 스킨 변경
           </button>
-          <button className="buttonCharacter" onClick={handleChangeCharacter}>
+          <button className="buttonCharacter" 
+            onClick={handleChangeCharacter}
+            style={{ backgroundColor: darken(CHAR_COLORS[numberValue]) }}>
             <FontAwesomeIcon icon={faUser} /> 캐릭터 변경
           </button>
-            <button className="buttonToggleSound" onClick={handleToggleSound}>
-              <FontAwesomeIcon icon={soundEnabled ? faVolumeUp : faVolumeMute} />
-            </button>
+          <button className="buttonToggleSound" onClick={handleToggleSound}>
+            <FontAwesomeIcon icon={soundEnabled ? faVolumeUp : faVolumeMute} />
+          </button>
+          <button className="buttonInfo" onClick={handleOpenInfo}>
+            <FontAwesomeIcon icon={faInfoCircle} />
+          </button>
         </div>
       </div>
-      <FontAwesomeIcon icon={faInfoCircle} className="info-icon" onClick={handleOpenInfo} />
       {infoModalOpen && (
         <>
           <div className="info-overlay" onClick={handleCloseInfo} />
