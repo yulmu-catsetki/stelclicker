@@ -318,3 +318,34 @@
     opacity: 0;
   }
 }
+
+/* 추가: 볼륨 슬라이더 커스텀 스타일 */
+input[type="range"].volume-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100px;
+  height: 6px;
+  background: #333; /* 어두운 배경색 */
+  outline: none;
+  border-radius: 3px;
+}
+
+input[type="range"].volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background: #222; /* 썸 색상 - 더 어두운색 */
+  border: 2px solid #555;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+input[type="range"].volume-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background: #222; /* 동일한 썸 색상 */
+  border: 2px solid #555;
+  border-radius: 50%;
+  cursor: pointer;
+}

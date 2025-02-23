@@ -7,7 +7,7 @@ import { faChartBar, faChevronUp, faChevronDown, faPaintBrush, faUser, faVolumeU
 import "./ClickerGame.css";
 import { useAudioPlayer } from "../hooks/useAudioPlayer";
 
-const GAME_VERSION = "0.17.1";
+const GAME_VERSION = "0.18.0";
 const CHAR_NAMES = ["텐코 시부키", "하나코 나나", "유즈하 리코", "아오쿠모 린"];
 const CHAR_SOUNDS = [
   "/asset/shibuki/debakbak.mp3",
@@ -72,7 +72,13 @@ const ClickerGame = () => {
   const [popups, setPopups] = useState<Popup[]>([]);
   const [numberValue, setNumberValue] = useState<number>(() => Math.floor(Math.random() * 4)); // 변경된 초기값
   const [statsOpen, setStatsOpen] = useState(true);
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [soundEnabled] = useState(true);
+  const [volume, setVolume] = useState<number>(() => {
+    if (typeof window === "undefined") return 50; // 서버에서는 기본값 50 반환
+    const stored = localStorage.getItem("volume");
+    return stored ? Number(stored) : 50;
+  });
+  const [volumeSliderVisible, setVolumeSliderVisible] = useState(false);
   const [avgSps, setAvgSps] = useState(0);
   const [infoModalOpen, setInfoModalOpen] = useState(false);
   const [fireworks, setFireworks] = useState<{ id: number; particles: { dx: number; dy: number }[] }[]>([]);
@@ -82,12 +88,17 @@ const ClickerGame = () => {
   const fadeDurations = [1200, 1000, 1800, 1000];  // 캐릭터 별로 다른 fadeout duration (밀리초)
 
   // 새 커스텀 훅 사용
-  const { playSound, initializeAudio } = useAudioPlayer(soundEnabled, fadeDurations, CHAR_SOUNDS);
+  const { playSound, initializeAudio } = useAudioPlayer(soundEnabled, fadeDurations, CHAR_SOUNDS, volume);
 
   // clickCounts 로컬 저장
   useEffect(() => {
     localStorage.setItem("clickCounts", JSON.stringify(clickCounts));
   }, [clickCounts]);
+
+  // localStorage에 볼륨 저장
+  useEffect(() => {
+    localStorage.setItem("volume", volume.toString());
+  }, [volume]);
 
   useEffect(() => {
     document.body.style.backgroundColor = CHAR_COLORS[numberValue];
@@ -182,10 +193,6 @@ const ClickerGame = () => {
     if (window.confirm("통계를 초기화 하시겠습니까?")) {
       setClickCounts({ 0: 0, 1: 0, 2: 0, 3: 0 });
     }
-  }, []);
-
-  const handleToggleSound = useCallback(() => {
-    setSoundEnabled(prev => !prev);
   }, []);
 
   // 정보 모달 열기/닫기 핸들러
@@ -294,11 +301,32 @@ const ClickerGame = () => {
             aria-label="캐릭터 변경">
             <FontAwesomeIcon icon={faUser} /> 캐릭터 변경
           </button>
-          <button className="buttonToggleSound" 
-            onClick={handleToggleSound}
-            aria-label="사운드 토글">
-            <FontAwesomeIcon icon={soundEnabled ? faVolumeUp : faVolumeMute} />
-          </button>
+          <div style={{ position: "relative", display: "inline-block", top: "10px" }}>
+            <button className="buttonSpeaker" 
+              onClick={() => setVolumeSliderVisible(prev => !prev)}
+              aria-label="볼륨 조절">
+              <FontAwesomeIcon icon={volume === 0 ? faVolumeMute : faVolumeUp} />
+            </button>
+            {volumeSliderVisible && (
+              <input
+                type="range"
+                className="volume-slider" // 추가된 클래스
+                min="0"
+                max="100"
+                value={volume}
+                onChange={(e) => setVolume(Number(e.target.value))}
+                aria-label="볼륨 조절 슬라이더"
+                style={{ 
+                  position: "absolute", 
+                  bottom: "230%",
+                  left: "50%", 
+                  transform: "translateX(-50%) rotate(-90deg)",
+                  width: "100px",
+                  background: adjustColor(CHAR_COLORS[numberValue], 0.7) // 캐릭터 배경보다 어두운 색
+                }}
+              />
+            )}
+          </div>
           <button className="buttonInfo" 
             onClick={handleOpenInfo}
             aria-label="정보 열기">
@@ -318,6 +346,7 @@ const ClickerGame = () => {
             <p>스텔라이브 3기생들을 클릭하는 게임입니다.</p>
             <p>여러 기능들을 경험해 보세요!</p>
             <p>버전 {GAME_VERSION}</p>
+            <p># 볼륨 조절 기능 추가, 린은 아직 추가되지 않았습니다.</p>
           </div>
         </>
       )}

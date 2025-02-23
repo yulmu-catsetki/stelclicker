@@ -3,8 +3,9 @@ import { useEffect, useRef, useCallback } from "react";
 export function useAudioPlayer(
   soundEnabled: boolean,
   fadeDurations: number[],
-  charSounds: string[]
-) {
+  charSounds: string[],
+  volume: number  // 네 번째 인자 추가
+): { playSound: (index: number) => Promise<void>, initializeAudio: () => Promise<void> } {
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioBuffersRef = useRef<AudioBuffer[]>([]);
   const currentAudioSourceRef = useRef<AudioBufferSourceNode | null>(null);
@@ -69,9 +70,11 @@ export function useAudioPlayer(
         source.connect(gainNode);
         gainNode.connect(audioContextRef.current!.destination);
 
+        // volume이 0일 때는 0.001로 처리하여 exponentialRampToValueAtTime의 오류 방지
+        const volumeFactor = volume === 0 ? 0.001 : volume / 100;
         gainNode.gain.setValueAtTime(0.001, audioContextRef.current!.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(
-          1,
+          volumeFactor,
           audioContextRef.current!.currentTime + 0.01
         );
         source.start(0, 0);
@@ -91,7 +94,7 @@ export function useAudioPlayer(
         console.error("Sound playback error:", error);
       }
     },
-    [soundEnabled, fadeDurations]
+    [soundEnabled, fadeDurations, volume] // volume dependency 추가
   );
 
   return { playSound, initializeAudio };
