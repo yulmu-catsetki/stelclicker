@@ -1,4 +1,11 @@
-import ClickerGame from '@/components/ClickerGame';
+'use client';
+
+import dynamic from 'next/dynamic';
+
+const ClickerGame = dynamic(
+  () => import('../components/ClickerGame'), 
+  { loading: () => <div>Loading...</div> }
+);
 
 export default function Home() {
   return (
