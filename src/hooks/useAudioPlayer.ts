@@ -1,5 +1,8 @@
 import { useEffect, useRef, useCallback } from "react";
 
+// 오디오 캐시를 위한 공유 객체 - 앱 전체에서 재사용
+const audioCache: { [url: string]: AudioBuffer } = {};
+
 export function useAudioPlayer(
   soundEnabled: boolean,
   fadeDurations: number[],
@@ -11,23 +14,51 @@ export function useAudioPlayer(
   const currentAudioSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const isInitializedRef = useRef(false);
   const fadeOutTimerRef = useRef<number | null>(null);
+  const loadingPromiseRef = useRef<Promise<void> | null>(null);
 
   const initializeAudio = useCallback(async () => {
     if (isInitializedRef.current || !soundEnabled) return;
-    try {
-      audioContextRef.current = new AudioContext();
-      const buffers = await Promise.all(
-        charSounds.map(async (url) => {
-          const response = await fetch(url);
-          const arrayBuffer = await response.arrayBuffer();
-          return audioContextRef.current!.decodeAudioData(arrayBuffer);
-        })
-      );
-      audioBuffersRef.current = buffers;
-      isInitializedRef.current = true;
-    } catch (error) {
-      console.error("Audio initialization failed:", error);
-    }
+    
+    // 이미 로딩 중이라면 해당 Promise 반환
+    if (loadingPromiseRef.current) return loadingPromiseRef.current;
+    
+    loadingPromiseRef.current = new Promise<void>(async (resolve) => {
+      try {
+        audioContextRef.current = new AudioContext();
+        
+        // 병렬로 여러 오디오 로드 시작 (캐싱 활용)
+        const loadPromises = charSounds.map(async (url, index) => {
+          try {
+            // 캐시에 있는지 확인
+            if (audioCache[url]) {
+              audioBuffersRef.current[index] = audioCache[url];
+              return;
+            }
+            
+            const response = await fetch(url);
+            const arrayBuffer = await response.arrayBuffer();
+            const audioBuffer = await audioContextRef.current!.decodeAudioData(arrayBuffer);
+            
+            // 캐시에 저장
+            audioCache[url] = audioBuffer;
+            audioBuffersRef.current[index] = audioBuffer;
+          } catch (err) {
+            console.error(`Failed to load audio ${url}:`, err);
+          }
+        });
+        
+        await Promise.all(loadPromises);
+        isInitializedRef.current = true;
+        resolve();
+      } catch (error) {
+        console.error("Audio initialization failed:", error);
+        resolve(); // 에러가 있어도 Promise는 완료
+      } finally {
+        loadingPromiseRef.current = null;
+      }
+    });
+    
+    return loadingPromiseRef.current;
   }, [charSounds, soundEnabled]);
 
   useEffect(() => {
@@ -60,10 +91,21 @@ export function useAudioPlayer(
           fadeOutTimerRef.current = null;
         }
         if (currentAudioSourceRef.current) {
-          currentAudioSourceRef.current.stop();
-          currentAudioSourceRef.current.disconnect();
+          try {
+            currentAudioSourceRef.current.stop();
+            currentAudioSourceRef.current.disconnect();
+          } catch {
+            // 이미 정지된 소스에 대한 에러 무시
+          }
           currentAudioSourceRef.current = null;
         }
+        
+        // 버퍼 존재 여부 확인
+        if (!audioBuffersRef.current[index]) {
+          console.warn(`Audio buffer at index ${index} not loaded yet`);
+          return;
+        }
+
         const source = audioContextRef.current!.createBufferSource();
         source.buffer = audioBuffersRef.current[index];
         currentAudioSourceRef.current = source;
@@ -71,7 +113,7 @@ export function useAudioPlayer(
         source.connect(gainNode);
         gainNode.connect(audioContextRef.current!.destination);
 
-        const volumeFactor = 0.1 * Math.pow(volume / 100, 1.4); // 볼륨 조절
+        const volumeFactor = volume / 200; // 볼륨 조절
         gainNode.gain.setValueAtTime(0.001, audioContextRef.current!.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(
           volumeFactor,
@@ -84,7 +126,11 @@ export function useAudioPlayer(
           audioContextRef.current!.currentTime + fadeDuration * 1.2
         );
         fadeOutTimerRef.current = window.setTimeout(() => {
-          source.stop();
+          try {
+            source.stop();
+          } catch {
+            // 이미 정지된 소스에 대한 에러 무시
+          }
           source.disconnect();
           gainNode.disconnect();
           currentAudioSourceRef.current = null;
@@ -96,6 +142,26 @@ export function useAudioPlayer(
     },
     [soundEnabled, fadeDurations, volume] // volume dependency 추가
   );
+
+  // 컴포넌트 언마운트 시 정리
+  useEffect(() => {
+    return () => {
+      if (fadeOutTimerRef.current !== null) {
+        clearTimeout(fadeOutTimerRef.current);
+      }
+      if (currentAudioSourceRef.current) {
+        try {
+          currentAudioSourceRef.current.stop();
+          currentAudioSourceRef.current.disconnect();
+        } catch {
+          // 무시
+        }
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(console.error);
+      }
+    };
+  }, []);
 
   return { playSound, initializeAudio };
 }
