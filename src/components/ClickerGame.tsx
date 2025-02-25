@@ -7,12 +7,13 @@ import { faChartBar, faChevronUp, faChevronDown, faPaintBrush, faUser, faVolumeU
 import { faGithub } from "@fortawesome/free-brands-svg-icons";
 import { useAudioPlayer } from "../hooks/useAudioPlayer";
 import "./ClickerGame.css";
+import { Analytics } from "@vercel/analytics/react"; // Vercel Analytics 추가
 
 // Rive 컴포넌트 지연 로딩 및 타입 가져오기
 const RiveComponentWrapper = lazy(() => import('../components/RiveWrapper').then(mod => ({ default: mod.default })));
 import type { RiveWrapperHandle } from '../components/RiveWrapper';
 
-const GAME_VERSION = "0.18.4";
+const GAME_VERSION = "0.18.5";
 const CHAR_NAMES = ["텐코 시부키", "하나코 나나", "유즈하 리코", "아오쿠모 린"];
 const CHAR_SOUNDS = [
   "/asset/shibuki/debakbak.mp3",
@@ -100,7 +101,7 @@ const ClickerGame = () => {
   // RiveWrapper의 ref 추가
   const riveWrapperRef = useRef<RiveWrapperHandle>(null);
 
-  // clickCounts 로컬 저장
+  // clickCounts 로컬 저장 
   useEffect(() => {
     localStorage.setItem("clickCounts", JSON.stringify(clickCounts));
   }, [clickCounts]);
@@ -226,7 +227,8 @@ const ClickerGame = () => {
   return (
     <>
       <div className="sps-panel">
-        <div>SPS: {avgSps.toFixed(1)}</div>
+        <div>SPS: {avgSps.toFixed(2)}</div>
+        <div>방문자 수: <Analytics /></div>
       </div>
       <div className="stats-panel">
         <div className="stats-header">
@@ -348,7 +350,7 @@ const ClickerGame = () => {
             {volumeSliderVisible && (
               <input
                 type="range"
-                className="volume-slider" // 추가된 클래스
+                className="volume-slider"
                 min="0"
                 max="100"
                 value={volume}
@@ -383,7 +385,7 @@ const ClickerGame = () => {
             </h2>
             <p>스텔라이브 3기생들을 클릭하는 게임입니다.</p>
             <p>여러 기능들을 경험해 보세요!</p>
-            <p>버전 {GAME_VERSION} # 웹사이트 성능 최적화 (린 아직 미구현)</p>
+            <p>버전 {GAME_VERSION} # 방문자 수 구현 (린 아직 추가 안됐어용)</p>
             <div style={{ position: "absolute", bottom: "10px", right: "10px" }}>
               <a href="https://github.com/yulmu-catsetki/stelclicker" target="_blank" rel="noopener noreferrer">
                 <FontAwesomeIcon icon={faGithub}/>
