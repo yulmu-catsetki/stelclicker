@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, Suspense, lazy } from "react";
-// useStateMachineInput 제거 - 더이상 직접 사용하지 않음
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faChartBar, faChevronUp, faChevronDown, faPaintBrush, faUser, faVolumeUp, faVolumeMute, faInfoCircle } from "@fortawesome/free-solid-svg-icons";
 import { faGithub } from "@fortawesome/free-brands-svg-icons";
@@ -13,7 +12,7 @@ import { Analytics } from "@vercel/analytics/react"; // Vercel Analytics 추가
 const RiveComponentWrapper = lazy(() => import('../components/RiveWrapper').then(mod => ({ default: mod.default })));
 import type { RiveWrapperHandle } from '../components/RiveWrapper';
 
-const GAME_VERSION = "0.18.5";
+const GAME_VERSION = "0.18.6";
 const CHAR_NAMES = ["텐코 시부키", "하나코 나나", "유즈하 리코", "아오쿠모 린"];
 const CHAR_SOUNDS = [
   "/asset/shibuki/debakbak.mp3",
@@ -203,7 +202,7 @@ const ClickerGame = () => {
   }, [clickCounts, numberValue, specialTriggered]);
 
   const handleSkinChange = useCallback(() => {
-    // console.log("Change Skin 버튼 클릭"); // 제거
+    // console.log("Change Skin 버튼 클릭"); // 언젠가...?
   }, []);
 
   const handleChangeCharacter = useCallback(() => {
@@ -228,7 +227,7 @@ const ClickerGame = () => {
     <>
       <div className="sps-panel">
         <div>SPS: {avgSps.toFixed(2)}</div>
-        <div>방문자 수: <Analytics /></div>
+        <Analytics />
       </div>
       <div className="stats-panel">
         <div className="stats-header">
@@ -385,7 +384,7 @@ const ClickerGame = () => {
             </h2>
             <p>스텔라이브 3기생들을 클릭하는 게임입니다.</p>
             <p>여러 기능들을 경험해 보세요!</p>
-            <p>버전 {GAME_VERSION} # 방문자 수 구현 (린 아직 추가 안됐어용)</p>
+            <p>버전 {GAME_VERSION} # (린 아직 추가 안됐어용)</p>
             <div style={{ position: "absolute", bottom: "10px", right: "10px" }}>
               <a href="https://github.com/yulmu-catsetki/stelclicker" target="_blank" rel="noopener noreferrer">
                 <FontAwesomeIcon icon={faGithub}/>
