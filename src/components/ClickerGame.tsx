@@ -1,14 +1,18 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useRive, useStateMachineInput } from "@rive-app/react-canvas";
+import React, { useState, useEffect, useRef, useCallback, Suspense, lazy } from "react";
+// useStateMachineInput 제거 - 더이상 직접 사용하지 않음
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faChartBar, faChevronUp, faChevronDown, faPaintBrush, faUser, faVolumeUp, faVolumeMute, faInfoCircle } from "@fortawesome/free-solid-svg-icons";
 import { faGithub } from "@fortawesome/free-brands-svg-icons";
 import { useAudioPlayer } from "../hooks/useAudioPlayer";
 import "./ClickerGame.css";
 
-const GAME_VERSION = "0.18.3";
+// Rive 컴포넌트 지연 로딩 및 타입 가져오기
+const RiveComponentWrapper = lazy(() => import('../components/RiveWrapper').then(mod => ({ default: mod.default })));
+import type { RiveWrapperHandle } from '../components/RiveWrapper';
+
+const GAME_VERSION = "0.18.4";
 const CHAR_NAMES = ["텐코 시부키", "하나코 나나", "유즈하 리코", "아오쿠모 린"];
 const CHAR_SOUNDS = [
   "/asset/shibuki/debakbak.mp3",
@@ -83,6 +87,8 @@ const ClickerGame = () => {
   const [avgSps, setAvgSps] = useState(0);
   const [infoModalOpen, setInfoModalOpen] = useState(false);
   const [fireworks, setFireworks] = useState<{ id: number; particles: { dx: number; dy: number }[] }[]>([]);
+  const [isRiveLoaded, setIsRiveLoaded] = useState(false);
+  const [isFirstInteraction, setIsFirstInteraction] = useState(true);
 
   const clickTimestampsRef = useRef<number[]>([]);
   const isClickingRef = useRef(false);
@@ -90,6 +96,9 @@ const ClickerGame = () => {
 
   // 새 커스텀 훅 사용
   const { playSound, initializeAudio } = useAudioPlayer(soundEnabled, fadeDurations, CHAR_SOUNDS, volume);
+
+  // RiveWrapper의 ref 추가
+  const riveWrapperRef = useRef<RiveWrapperHandle>(null);
 
   // clickCounts 로컬 저장
   useEffect(() => {
@@ -103,51 +112,61 @@ const ClickerGame = () => {
 
   useEffect(() => {
     document.body.style.backgroundColor = CHAR_COLORS[numberValue];
-  }, [numberValue]);
-
-  const { rive, RiveComponent } = useRive({
-    src: "/asset/shibuki/shibuki.riv",
-    stateMachines: "State Machine 1",
-    artboard: "Artboard",
-    autoplay: true,
-  });
-  const triggerInput = useStateMachineInput(rive, "State Machine 1", "Trigger 1");
-  const numberInput = useStateMachineInput(rive, "State Machine 1", "number");
-
-  useEffect(() => {
-    if (numberInput) {
-      numberInput.value = numberValue;
+    
+    // IntersectionObserver를 사용하여 Rive 컴포넌트 뷰포트에 보이면 로드
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          // 10ms 지연 후 Rive 로드 (초기 레이아웃 계산에 방해되지 않도록)
+          setTimeout(() => setIsRiveLoaded(true), 10);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.1 }
+    );
+    
+    const container = document.querySelector('.game-container');
+    if (container) {
+      observer.observe(container);
     }
-  }, [numberValue, numberInput]);
+
+    return () => observer.disconnect();
+  }, [numberValue]);
 
   const handleInteraction = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
     if (isClickingRef.current) return;
-    if (triggerInput) {
-      isClickingRef.current = true;
-      triggerInput.fire();
-      playSound(numberValue);
-      setClickCounts(prev => ({ ...prev, [numberValue]: (prev[numberValue] || 0) + 1 }));
-      clickTimestampsRef.current.push(Date.now());
-      setRotateAngle(Math.random() < 0.5 ? 10 : -10);
-      setAnimateCount(true);
-      setTimeout(() => setAnimateCount(false), 300);
-      const { top, left } = getRandomPopupPosition();
-      const popupId = Date.now();
-      setPopups(prev => [...prev, { id: popupId, top, left, message: CHAR_POPUP_MESSAGES[numberValue] }]);
-      const pointerUpHandler = () => {
-        isClickingRef.current = false;
-        window.removeEventListener("pointerup", pointerUpHandler);
-      };
-      window.addEventListener("pointerup", pointerUpHandler);
-    }
-  }, [playSound, numberValue, triggerInput]);
+    isClickingRef.current = true;
+
+    // 필요한 경우 ref를 통해 트리거 호출 가능
+    // if (riveWrapperRef.current) {
+    //   riveWrapperRef.current.fireTrigger();
+    // }
+    
+    playSound(numberValue);
+    setClickCounts(prev => ({ ...prev, [numberValue]: (prev[numberValue] || 0) + 1 }));
+    clickTimestampsRef.current.push(Date.now());
+    setRotateAngle(Math.random() < 0.5 ? 10 : -10);
+    setAnimateCount(true);
+    setTimeout(() => setAnimateCount(false), 300);
+    const { top, left } = getRandomPopupPosition();
+    const popupId = Date.now();
+    setPopups(prev => [...prev, { id: popupId, top, left, message: CHAR_POPUP_MESSAGES[numberValue] }]);
+    const pointerUpHandler = () => {
+      isClickingRef.current = false;
+      window.removeEventListener("pointerup", pointerUpHandler);
+    };
+    window.addEventListener("pointerup", pointerUpHandler);
+  }, [playSound, numberValue]);
 
   // 최초 사용자 상호작용 시 오디오 초기화를 시도한 후 handleInteraction 호출
   const handleFirstInteraction = useCallback(async (e: React.PointerEvent) => {
-    await initializeAudio();
+    if (isFirstInteraction) {
+      await initializeAudio();
+      setIsFirstInteraction(false);
+    }
     handleInteraction(e);
-  }, [initializeAudio, handleInteraction]);
+  }, [initializeAudio, handleInteraction, isFirstInteraction]);
 
   // SPS (Stel Per Second, 초당 클릭 수) 계산
   useEffect(() => {
@@ -277,7 +296,25 @@ const ClickerGame = () => {
           ))}
         </div>
         <div className="riveContainer">
-          <RiveComponent onPointerDown={handleFirstInteraction} />
+          {isRiveLoaded ? (
+            <Suspense fallback={<div className="rive-loading">캐릭터 로딩 중...</div>}>
+              <RiveComponentWrapper 
+                ref={riveWrapperRef}
+                src="/asset/shibuki/shibuki.riv"
+                stateMachine="State Machine 1"
+                artboard="Artboard"
+                onPointerDown={handleFirstInteraction}
+                numberValue={numberValue}
+              />
+            </Suspense>
+          ) : (
+            <div 
+              className="rive-placeholder" 
+              onClick={() => setIsRiveLoaded(true)}
+            >
+              클릭하여 캐릭터 로드
+            </div>
+          )}
           {popups.map(popup => (
             <span
               key={popup.id}
@@ -346,8 +383,7 @@ const ClickerGame = () => {
             </h2>
             <p>스텔라이브 3기생들을 클릭하는 게임입니다.</p>
             <p>여러 기능들을 경험해 보세요!</p>
-            <p>버전 {GAME_VERSION}</p>
-            <p># github 페이지 추가 (린 아직 미구현)</p>
+            <p>버전 {GAME_VERSION} # 웹사이트 성능 최적화 (린 아직 미구현)</p>
             <div style={{ position: "absolute", bottom: "10px", right: "10px" }}>
               <a href="https://github.com/yulmu-catsetki/stelclicker" target="_blank" rel="noopener noreferrer">
                 <FontAwesomeIcon icon={faGithub}/>
