@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 
 // 오디오 캐시를 위한 공유 객체 - 앱 전체에서 재사용
 const audioCache: { [url: string]: AudioBuffer } = {};
@@ -15,6 +15,13 @@ export function useAudioPlayer(
   const isInitializedRef = useRef(false);
   const fadeOutTimerRef = useRef<number | null>(null);
   const loadingPromiseRef = useRef<Promise<void> | null>(null);
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsReady(true);
+    }
+  }, []);
 
   const initializeAudio = useCallback(async () => {
     if (isInitializedRef.current || !soundEnabled) return;
@@ -80,7 +87,7 @@ export function useAudioPlayer(
 
   const playSound = useCallback(
     async (index: number) => {
-      if (!soundEnabled || !isInitializedRef.current) return;
+      if (!isReady || !soundEnabled || !isInitializedRef.current) return;
       if (volume === 0) return; // 볼륨이 0이면 소리를 재생하지 않음 (완전 침묵)
       try {
         if (audioContextRef.current?.state === "suspended") {
@@ -140,7 +147,7 @@ export function useAudioPlayer(
         console.error("Sound playback error:", error);
       }
     },
-    [soundEnabled, fadeDurations, volume] // volume dependency 추가
+    [isReady, soundEnabled, fadeDurations, volume] // volume dependency 추가
   );
 
   // 컴포넌트 언마운트 시 정리
@@ -164,4 +171,40 @@ export function useAudioPlayer(
   }, []);
 
   return { playSound, initializeAudio };
+}
+
+export function useAudioPlayerSingle(audioFile: string) { // export function으로 변경
+  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
+  const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
+
+  useEffect(() => {
+    const initializeAudio = async () => {
+      if (typeof window !== 'undefined') {
+        const context = new AudioContext();
+        setAudioContext(context);
+
+        try {
+          const response = await fetch(audioFile);
+          const arrayBuffer = await response.arrayBuffer();
+          const buffer = await context.decodeAudioData(arrayBuffer);
+          setAudioBuffer(buffer);
+        } catch (error) {
+          console.error("Error loading audio:", error);
+        }
+      }
+    };
+
+    initializeAudio();
+  }, [audioFile]);
+
+  const playAudio = () => {
+    if (audioContext && audioBuffer) {
+      const source = audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContext.destination);
+      source.start();
+    }
+  };
+
+  return { playAudio };
 }

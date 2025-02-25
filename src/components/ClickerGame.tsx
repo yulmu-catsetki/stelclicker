@@ -12,7 +12,7 @@ import { Analytics } from "@vercel/analytics/react"; // Vercel Analytics 추가
 const RiveComponentWrapper = lazy(() => import('../components/RiveWrapper').then(mod => ({ default: mod.default })));
 import type { RiveWrapperHandle } from '../components/RiveWrapper';
 
-const GAME_VERSION = "1.0.0";
+const GAME_VERSION = "1.0.2"; // 버전 업데이트
 const CHAR_NAMES = ["텐코 시부키", "하나코 나나", "유즈하 리코", "아오쿠모 린"];
 const CHAR_SOUNDS = [
   "/asset/shibuki/debakbak.mp3",
@@ -60,7 +60,20 @@ const getRandomPopupPosition = (): { top: string; left: string } => {
 const ClickerGame = () => {
   const [clickCounts, setClickCounts] = useState<{ [key: number]: number }>(() => {
     if (typeof window !== "undefined") {
+      const storedVersion = localStorage.getItem("gameVersion");
       const stored = localStorage.getItem("clickCounts");
+      
+      // 버전이 다르면 캐시를 초기화하되 클릭 통계는 유지
+      if (storedVersion !== GAME_VERSION) {
+        console.log("게임 버전이 변경되어 캐시를 초기화합니다.");
+        localStorage.clear(); // 모든 캐시 초기화
+        // 클릭 통계만 다시 저장
+        if (stored) {
+          localStorage.setItem("clickCounts", stored);
+        }
+        localStorage.setItem("gameVersion", GAME_VERSION);
+      }
+      
       return stored ? JSON.parse(stored) : { 0: 0, 1: 0, 2: 0, 3: 0 };
     }
     return { 0: 0, 1: 0, 2: 0, 3: 0 };
@@ -384,7 +397,7 @@ const ClickerGame = () => {
             </h2>
             <p>스텔라이브 3기생들을 클릭하는 게임입니다.</p>
             <p>여러 기능들을 경험해 보세요!</p>
-            <p>버전 {GAME_VERSION} # 린 추가 완료 2025.02.25 </p>
+            <p>버전 {GAME_VERSION} </p>
             <div style={{ position: "absolute", bottom: "10px", right: "10px" }}>
               <a href="https://github.com/yulmu-catsetki/stelclicker" target="_blank" rel="noopener noreferrer">
                 <FontAwesomeIcon icon={faGithub}/>
