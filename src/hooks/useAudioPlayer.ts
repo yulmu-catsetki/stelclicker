@@ -24,7 +24,7 @@ export function useAudioPlayer(
   }, []);
 
   const initializeAudio = useCallback(async () => {
-    if (isInitializedRef.current || !soundEnabled) return;
+    if (isInitializedRef.current || !soundEnabled) return Promise.resolve();
     
     // 이미 로딩 중이라면 해당 Promise 반환
     if (loadingPromiseRef.current) return loadingPromiseRef.current;
@@ -32,7 +32,6 @@ export function useAudioPlayer(
     loadingPromiseRef.current = new Promise<void>(async (resolve) => {
       try {
         // iOS/Safari 호환성 개선: 오디오 컨텍스트를 resume 상태로 시작
-        // any 타입 사용 대신 적절한 타입 지정
         const AudioContextClass = window.AudioContext || 
           (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
           
@@ -41,10 +40,17 @@ export function useAudioPlayer(
           return resolve();
         }
         
+        // 사용자 상호작용 내에서 AudioContext 생성
         audioContextRef.current = new AudioContextClass();
         
+        // 중요: 사용자 상호작용 내에서 즉시 resume 시도
         if (audioContextRef.current.state === "suspended") {
-          await audioContextRef.current.resume();
+          try {
+            await audioContextRef.current.resume();
+            console.log("AudioContext resumed successfully");
+          } catch (err) {
+            console.warn("AudioContext resume failed:", err);
+          }
         }
         
         // 오디오 데이터 미리 로드
@@ -58,6 +64,16 @@ export function useAudioPlayer(
             
             const response = await fetch(url);
             const arrayBuffer = await response.arrayBuffer();
+            
+            // 중요: decodeAudioData 전에 상태 다시 확인
+            if (audioContextRef.current?.state === "suspended") {
+              try {
+                await audioContextRef.current.resume();
+              } catch (err) {
+                console.warn("Failed to resume AudioContext before decoding:", err);
+              }
+            }
+            
             const audioBuffer = await audioContextRef.current!.decodeAudioData(arrayBuffer);
             
             // 캐시에 저장
@@ -71,13 +87,18 @@ export function useAudioPlayer(
         await Promise.all(loadPromises);
         
         // 사일런트 오디오 재생 (일부 브라우저에서 오디오 활성화 트릭)
-        const silentBuffer = audioContextRef.current.createBuffer(1, 1, 22050);
-        const source = audioContextRef.current.createBufferSource();
-        source.buffer = silentBuffer;
-        source.connect(audioContextRef.current.destination);
-        source.start(0);
+        try {
+          const silentBuffer = audioContextRef.current.createBuffer(1, 1, 22050);
+          const source = audioContextRef.current.createBufferSource();
+          source.buffer = silentBuffer;
+          source.connect(audioContextRef.current.destination);
+          source.start(0);
+        } catch (err) {
+          console.warn("Silent audio play failed:", err);
+        }
         
         isInitializedRef.current = true;
+        console.log("Audio system initialized successfully");
         resolve();
       } catch (error) {
         console.error("Audio initialization failed:", error);
@@ -91,25 +112,37 @@ export function useAudioPlayer(
   }, [charSounds, soundEnabled]);
 
   useEffect(() => {
-    const handleFocus = async () => {
+    // 사용자 인터랙션 이벤트를 모니터링하여 AudioContext 활성화 기회 확보
+    const activateAudioContext = async () => {
       if (audioContextRef.current && audioContextRef.current.state === "suspended") {
         try {
           await audioContextRef.current.resume();
-          console.log("Audio context resumed on focus.");
-        } catch (error) {
-          console.error("Audio context resume failed:", error);
+          console.log("AudioContext resumed via user interaction");
+        } catch (err) {
+          console.warn("Failed to resume AudioContext:", err);
         }
       }
     };
-    window.addEventListener("focus", handleFocus);
+
+    // 다양한 사용자 상호작용 이벤트에 리스너 추가
+    const interactionEvents = ['click', 'touchstart', 'keydown', 'pointerdown'];
+    interactionEvents.forEach(event => {
+      window.addEventListener(event, activateAudioContext, { once: true });
+    });
+
+    window.addEventListener("focus", activateAudioContext);
+
     return () => {
-      window.removeEventListener("focus", handleFocus);
+      interactionEvents.forEach(event => {
+        window.removeEventListener(event, activateAudioContext);
+      });
+      window.removeEventListener("focus", activateAudioContext);
     };
   }, []);
 
   const playSound = useCallback(
     async (index: number) => {
-      // 호출 즉시 오디오 초기화 시도 (이미 초기화된 경우는 무시됨)
+      // 사용자 상호작용 내에서 오디오 초기화
       if (!isInitializedRef.current) {
         await initializeAudio();
       }
@@ -204,35 +237,97 @@ export function useAudioPlayer(
 export function useAudioPlayerSingle(audioFile: string) { // export function으로 변경
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
+  const isInitializedRef = useRef(false);
 
   useEffect(() => {
+    // audioContext가 이미 존재하면 초기화하지 않음
+    if (audioContext) return;
+    
     const initializeAudio = async () => {
-      if (typeof window !== 'undefined') {
-        const context = new AudioContext();
-        setAudioContext(context);
+      if (typeof window !== 'undefined' && !isInitializedRef.current) {
+        // 사용자 상호작용 이벤트에서 초기화할 수 있도록 함
+        const initOnInteraction = () => {
+          const context = new AudioContext();
+          setAudioContext(context);
+          
+          if (context.state === "suspended") {
+            context.resume().catch(err => console.warn("Failed to resume AudioContext:", err));
+          }
 
-        try {
-          const response = await fetch(audioFile);
-          const arrayBuffer = await response.arrayBuffer();
-          const buffer = await context.decodeAudioData(arrayBuffer);
-          setAudioBuffer(buffer);
-        } catch (error) {
-          console.error("Error loading audio:", error);
-        }
+          // 오디오 로드
+          fetch(audioFile)
+            .then(response => response.arrayBuffer())
+            .then(arrayBuffer => context.decodeAudioData(arrayBuffer))
+            .then(buffer => {
+              setAudioBuffer(buffer);
+              isInitializedRef.current = true;
+            })
+            .catch(error => {
+              console.error("Error loading audio:", error);
+            });
+          
+          // 한 번만 실행하도록 이벤트 리스너 제거
+          document.removeEventListener('click', initOnInteraction);
+          document.removeEventListener('touchstart', initOnInteraction);
+        };
+
+        // 사용자 상호작용 이벤트에 리스너 추가
+        document.addEventListener('click', initOnInteraction, { once: true });
+        document.addEventListener('touchstart', initOnInteraction, { once: true });
       }
     };
 
     initializeAudio();
-  }, [audioFile]);
+    
+    // dependency 배열에 audioContext가 없으므로 컴포넌트 언마운트 시에만 실행됨
+  }, [audioFile, audioContext]);
+  
+  // audioContext cleanup은 별도 useEffect로 분리
+  useEffect(() => {
+    return () => {
+      if (audioContext) {
+        audioContext.close().catch(console.error);
+      }
+    };
+  }, [audioContext]);
 
-  const playAudio = () => {
+  const playAudio = useCallback(() => {
     if (audioContext && audioBuffer) {
+      // 재생 전 컨텍스트 상태 확인
+      if (audioContext.state === "suspended") {
+        audioContext.resume().catch(console.error);
+      }
+      
       const source = audioContext.createBufferSource();
       source.buffer = audioBuffer;
       source.connect(audioContext.destination);
       source.start();
+    } else if (!isInitializedRef.current) {
+      // 아직 초기화되지 않은 경우 초기화 시도
+      const context = new AudioContext();
+      setAudioContext(context);
+      
+      // 사용자 제스처 내에서 재생 시도하므로 resume 직접 호출
+      context.resume().catch(console.error);
+      
+      fetch(audioFile)
+        .then(response => response.arrayBuffer())
+        .then(arrayBuffer => context.decodeAudioData(arrayBuffer))
+        .then(buffer => {
+          setAudioBuffer(buffer);
+          isInitializedRef.current = true;
+          
+          // 버퍼 로드 후 바로 재생
+          const source = context.createBufferSource();
+          source.buffer = buffer;
+          source.connect(context.destination);
+          source.start();
+        })
+        .catch(error => {
+          console.error("Error loading audio:", error);
+        });
     }
-  };
+  }, [audioContext, audioBuffer, audioFile]);
 
   return { playAudio };
 }
