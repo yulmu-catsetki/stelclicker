@@ -53,7 +53,6 @@ const ClickerGame = () => {
         const stored = localStorage.getItem("clickCounts");
         // 버전이 다르거나 없으면 캐시를 초기화하되 클릭 통계는 유지
         if (!storedVersion || storedVersion !== GAME_VERSION) {
-          console.log("게임 버전이 변경되어 캐시를 초기화합니다.");
           const tempClickCounts = stored ? JSON.parse(stored) : { 0: 0, 1: 0, 2: 0, 3: 0 };
           // 모든 캐시 초기화
           for (let i = 0; i < localStorage.length; i++) {
@@ -159,21 +158,16 @@ const ClickerGame = () => {
   useEffect(() => {
     // 컴포넌트 마운트 시 오디오 초기화 시작
     if (!isAudioInitializedRef.current) {
-      console.log("페이지 로드 - 오디오 시스템 준비");
-      
       // 모든 사용자 상호작용을 감지하는 이벤트 핸들러 추가
       const userInteractionHandler = async () => {
         if (isAudioInitializedRef.current) return; // 이미 초기화되었다면 무시
         
         try {
-          console.log("사용자 상호작용 감지 - 오디오 초기화 시작");
           await initializeAudio();
           isAudioInitializedRef.current = true;
-          console.log("오디오 초기화 완료");
           
           // 초기화 후 대기 중인 소리 재생 처리
           if (pendingPlayRef.current !== null) {
-            console.log(`대기 중이던 사운드(${pendingPlayRef.current}) 재생`);
             playSound(pendingPlayRef.current);
             pendingPlayRef.current = null;
           }
@@ -188,14 +182,17 @@ const ClickerGame = () => {
       };
       
       // 사용자 상호작용을 감지하는 이벤트 리스너 추가 (캡처링 단계에서 실행)
+      // passive: true 옵션 추가 및 타입 캐스팅
       ['click', 'touchstart', 'touchend', 'pointerdown', 'mousedown'].forEach(event => {
-        document.addEventListener(event, userInteractionHandler, { capture: true, once: true });
+        document.addEventListener(event, userInteractionHandler, 
+          { capture: true, once: true, passive: true } as AddEventListenerOptions);
       });
       
       // 컴포넌트가 언마운트될 때 이벤트 리스너 제거
       return () => {
         ['click', 'touchstart', 'touchend', 'pointerdown', 'mousedown'].forEach(event => {
-          document.removeEventListener(event, userInteractionHandler, { capture: true });
+          document.removeEventListener(event, userInteractionHandler, 
+            { capture: true } as EventListenerOptions);
         });
       };
     }
@@ -232,12 +229,8 @@ const ClickerGame = () => {
               touch.clientY >= rect.top &&
               touch.clientY <= rect.bottom
             ) {
-              // Rive 캐릭터 영역 내 터치 확인
-              console.log("캐릭터 영역 터치 감지");
-              
               // 오디오 초기화 및 재생 로직
               if (!isAudioInitializedRef.current) {
-                console.log("터치 이벤트에서 오디오 초기화");
                 pendingPlayRef.current = numberValue;
                 await initializeAudio()
                   .then(() => {
@@ -290,17 +283,20 @@ const ClickerGame = () => {
       touchStartPositionRef.current = null;
     };
 
-    // 터치 이벤트 리스너 등록
-    if (clickAreaRef.current) {
-      clickAreaRef.current.addEventListener('touchstart', handleTouchStart);
-      clickAreaRef.current.addEventListener('touchend', handleTouchEnd);
+    // 경고 해결: ref.current 값을 지역 변수에 저장하여 cleanup에서 사용
+    const currentElement = clickAreaRef.current;
+
+    // 터치 이벤트 리스너 등록 - 지역 변수 사용
+    if (currentElement) {
+      currentElement.addEventListener('touchstart', handleTouchStart, { passive: true } as AddEventListenerOptions);
+      currentElement.addEventListener('touchend', handleTouchEnd, { passive: true } as AddEventListenerOptions);
     }
 
     return () => {
-      // 컴포넌트 언마운트 시 이벤트 리스너 제거
-      if (clickAreaRef.current) {
-        clickAreaRef.current.removeEventListener('touchstart', handleTouchStart);
-        clickAreaRef.current.removeEventListener('touchend', handleTouchEnd);
+      // 컴포넌트 언마운트 시 이벤트 리스너 제거 - 지역 변수 사용
+      if (currentElement) {
+        currentElement.removeEventListener('touchstart', handleTouchStart, { passive: true } as EventListenerOptions);
+        currentElement.removeEventListener('touchend', handleTouchEnd, { passive: true } as EventListenerOptions);
       }
     };
   }, [numberValue, getRandomPopupPosition, initializeAudio, playSound]);
@@ -313,8 +309,6 @@ const ClickerGame = () => {
     if (isClickingRef.current) return;
     isClickingRef.current = true;
     
-    console.log("클릭/포인터 이벤트 감지!");
-    
     // Rive 트리거 호출
     if (riveWrapperRef.current) {
       riveWrapperRef.current.fireTrigger();
@@ -323,12 +317,10 @@ const ClickerGame = () => {
     // 오디오 처리 - 사용자 상호작용 내에서 오디오 초기화 및 재생
     if (!isAudioInitializedRef.current) {
       // 아직 초기화되지 않았다면, 초기화 후 재생
-      console.log("클릭 핸들러에서 오디오 초기화");
       pendingPlayRef.current = numberValue;
       initializeAudio()
         .then(() => {
           isAudioInitializedRef.current = true;
-          console.log("클릭 핸들러에서 오디오 초기화 성공");
           playSound(numberValue);
           pendingPlayRef.current = null;
         })
@@ -337,7 +329,6 @@ const ClickerGame = () => {
         });
     } else {
       // 이미 초기화된 경우 바로 소리 재생
-      console.log("이미 초기화된 상태에서 소리 재생");
       playSound(numberValue);
     }
     
@@ -389,7 +380,6 @@ const ClickerGame = () => {
     const thresholds = SPECIAL_THRESHOLDS[numberValue] || [];
     thresholds.forEach(threshold => {
       if (currentCount === threshold && !specialTriggered[numberValue].includes(threshold)) {
-        console.log(`${CHAR_NAMES[numberValue]}: 특수 이벤트 발생! (${threshold} 만큼 클릭)`);
         setSpecialTriggered(prev => ({ 
           ...prev,
           [numberValue]: [...prev[numberValue], threshold],

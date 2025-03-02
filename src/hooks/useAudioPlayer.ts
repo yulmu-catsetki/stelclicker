@@ -47,7 +47,6 @@ export function useAudioPlayer(
         if (audioContextRef.current.state === "suspended") {
           try {
             await audioContextRef.current.resume();
-            console.log("AudioContext resumed successfully");
           } catch (err) {
             console.warn("AudioContext resume failed:", err);
           }
@@ -98,7 +97,6 @@ export function useAudioPlayer(
         }
         
         isInitializedRef.current = true;
-        console.log("Audio system initialized successfully");
         resolve();
       } catch (error) {
         console.error("Audio initialization failed:", error);
@@ -117,26 +115,29 @@ export function useAudioPlayer(
       if (audioContextRef.current && audioContextRef.current.state === "suspended") {
         try {
           await audioContextRef.current.resume();
-          console.log("AudioContext resumed via user interaction");
         } catch (err) {
           console.warn("Failed to resume AudioContext:", err);
         }
       }
     };
 
-    // 다양한 사용자 상호작용 이벤트에 리스너 추가
+    // 다양한 사용자 상호작용 이벤트에 리스너 추가 - passive 옵션에 타입 캐스팅 추가
     const interactionEvents = ['click', 'touchstart', 'keydown', 'pointerdown'];
     interactionEvents.forEach(event => {
-      window.addEventListener(event, activateAudioContext, { once: true });
+      window.addEventListener(event, activateAudioContext, 
+        { once: true, passive: true } as AddEventListenerOptions);
     });
 
-    window.addEventListener("focus", activateAudioContext);
+    window.addEventListener("focus", activateAudioContext, 
+      { passive: true } as AddEventListenerOptions);
 
     return () => {
       interactionEvents.forEach(event => {
-        window.removeEventListener(event, activateAudioContext);
+        window.removeEventListener(event, activateAudioContext, 
+          { passive: true } as EventListenerOptions);
       });
-      window.removeEventListener("focus", activateAudioContext);
+      window.removeEventListener("focus", activateAudioContext, 
+        { passive: true } as EventListenerOptions);
     };
   }, []);
 
@@ -271,9 +272,11 @@ export function useAudioPlayerSingle(audioFile: string) { // export function으�
           document.removeEventListener('touchstart', initOnInteraction);
         };
 
-        // 사용자 상호작용 이벤트에 리스너 추가
-        document.addEventListener('click', initOnInteraction, { once: true });
-        document.addEventListener('touchstart', initOnInteraction, { once: true });
+        // 사용자 상호작용 이벤트에 리스너 추가 - passive 옵션 타입 추가
+        document.addEventListener('click', initOnInteraction, 
+          { once: true, passive: true } as AddEventListenerOptions);
+        document.addEventListener('touchstart', initOnInteraction, 
+          { once: true, passive: true } as AddEventListenerOptions);
       }
     };
 
