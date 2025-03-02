@@ -1,5 +1,5 @@
-import React, { useEffect, forwardRef, useImperativeHandle } from 'react';
-import { useRive, useStateMachineInput } from '@rive-app/react-canvas';
+import React, { useEffect, forwardRef, useImperativeHandle, useRef, useState } from 'react';
+import { useRive, useStateMachineInput, Layout, Fit, Alignment } from '@rive-app/react-canvas';
 
 // ref를 통해 노출할 메서드 타입 정의
 export interface RiveWrapperHandle {
@@ -22,11 +22,53 @@ const RiveWrapper = forwardRef<RiveWrapperHandle, RiveWrapperProps>(({
   onPointerDown,
   numberValue
 }, ref) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+
+  // 화면 크기 변경에 따른 Rive 크기 조정
+  useEffect(() => {
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const isLandscape = viewportWidth > viewportHeight;
+        
+        let size: number;
+        if (isLandscape) {
+          // 가로 모드: 더 큰 크기로 조정
+          size = Math.min(viewportHeight * 0.70, viewportWidth * 0.55, 1000);
+        } else {
+          // 세로 모드: 더 큰 크기로 조정
+          size = Math.min(viewportWidth * 0.95, viewportHeight * 0.55, 1000);
+        }
+        
+        // 매우 작은 화면일 경우 추가 조정
+        if (viewportHeight < 400) {
+          size = Math.min(size, viewportWidth * 0.65);
+        }
+        
+        setDimensions({ width: size, height: size });
+      }
+    };
+
+    // 초기 및 리사이즈 시 크기 업데이트
+    updateDimensions();
+    window.addEventListener('resize', updateDimensions);
+    
+    return () => {
+      window.removeEventListener('resize', updateDimensions);
+    };
+  }, []);
+
   const { rive, RiveComponent } = useRive({
     src,
     stateMachines: stateMachine,
     artboard,
     autoplay: true,
+    layout: new Layout({
+      fit: Fit.Contain, 
+      alignment: Alignment.Center
+    })
   });
   
   const triggerInput = useStateMachineInput(rive, stateMachine, "Trigger 1");
@@ -39,7 +81,7 @@ const RiveWrapper = forwardRef<RiveWrapperHandle, RiveWrapperProps>(({
     }
   }, [numberValue, numberInput]);
 
-  // 트리거 함수를 노출 - useImperativeHandle 올바르게 사용
+  // 트리거 함수를 노출
   useImperativeHandle(ref, () => ({
     fireTrigger: () => {
       if (triggerInput) {
@@ -48,7 +90,7 @@ const RiveWrapper = forwardRef<RiveWrapperHandle, RiveWrapperProps>(({
     }
   }));
 
-  // 클릭 핸들러 - 트리거를 발생시키고 상위 컴포넌트의 핸들러를 호출
+  // 클릭 핸들러
   const handlePointerDown = (e: React.PointerEvent) => {
     if (triggerInput) {
       triggerInput.fire();
@@ -56,10 +98,27 @@ const RiveWrapper = forwardRef<RiveWrapperHandle, RiveWrapperProps>(({
     onPointerDown(e);
   };
 
-  return <RiveComponent onPointerDown={handlePointerDown} />;
+  return (
+    <div 
+      ref={containerRef} 
+      style={{ 
+        width: dimensions.width > 0 ? `${dimensions.width}px` : '100%', 
+        height: dimensions.height > 0 ? `${dimensions.height}px` : '100%',
+        margin: '0 auto'
+      }}
+    >
+      <RiveComponent 
+        onPointerDown={handlePointerDown}
+        style={{ 
+          width: '100%', 
+          height: '100%'
+        }}
+      />
+    </div>
+  );
 });
 
-// 컴포넌트에 표시 이름 추가 (디버깅 도구에서 확인할 때 유용)
+// 컴포넌트에 표시 이름 추가
 RiveWrapper.displayName = 'RiveWrapper';
 
 export default RiveWrapper;

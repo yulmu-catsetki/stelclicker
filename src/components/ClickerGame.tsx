@@ -12,7 +12,7 @@ import { Analytics } from "@vercel/analytics/react"; // Vercel Analytics 추가
 const RiveComponentWrapper = lazy(() => import('../components/RiveWrapper').then(mod => ({ default: mod.default })));
 import type { RiveWrapperHandle } from '../components/RiveWrapper';
 
-const GAME_VERSION = "1.1.0"; // 버전 업데이트
+const GAME_VERSION = "1.2.0"; // 버전 업데이트
 const CHAR_NAMES = ["텐코 시부키", "하나코 나나", "유즈하 리코", "아오쿠모 린"];
 const CHAR_SOUNDS = [
   "/asset/shibuki/debakbak.mp3",
@@ -263,7 +263,7 @@ const ClickerGame = () => {
       <div className="stats-panel">
         <div className="stats-header">
             <div style={{ fontWeight: "bold" }}>
-            <FontAwesomeIcon icon={faChartBar} />클릭 통계
+            <FontAwesomeIcon icon={faChartBar} />
             </div>
           <button className="toggle-stats-button" 
             onClick={() => setStatsOpen(prev => !prev)}
@@ -295,83 +295,87 @@ const ClickerGame = () => {
       </div>
 
       <div className="container game-container">
-        <div className="character-name">{CHAR_NAMES[numberValue]}</div>
-        <div className="clickCounterWrapper" style={{ position: "relative", display: "inline-block" }}>
-          <div className="clickCounter" style={animateCount ? { transform: `scale(1.2) rotate(${rotateAngle}deg)` } : {}}>
-            {clickCounts[numberValue] || 0}
+        <div className="top-content">
+          <div className="character-name">{CHAR_NAMES[numberValue]}</div>
+          <div className="clickCounterWrapper">
+            <div className="clickCounter" style={animateCount ? { transform: `scale(1.2) rotate(${rotateAngle}deg)` } : {}}>
+              {clickCounts[numberValue] || 0}
+            </div>
+            {fireworks.map(fw => (
+              <div
+                key={fw.id}
+                className="fireworks-container"
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  height: "100%",
+                  "--bright-color": adjustColor(CHAR_COLORS[numberValue], 1.3)
+                } as React.CSSProperties}
+                onAnimationEnd={() => setFireworks(old => old.filter(f => f.id !== fw.id))}
+              >
+                {fw.particles.map((p, idx) => (
+                  <span
+                    key={idx}
+                    className="firework"
+                    style={{
+                      "--dx": `${p.dx}px`,
+                      "--dy": `${p.dy}px`
+                    } as React.CSSProperties}
+                  />
+                ))}
+              </div>
+            ))}
           </div>
-          {fireworks.map(fw => (
-            <div
-              key={fw.id}
-              className="fireworks-container"
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                height: "100%",
-                "--bright-color": adjustColor(CHAR_COLORS[numberValue], 1.3)
-              } as React.CSSProperties}
-              onAnimationEnd={() => setFireworks(old => old.filter(f => f.id !== fw.id))}
-            >
-              {fw.particles.map((p, idx) => (
-                <span
-                  key={idx}
-                  className="firework"
-                  style={{
-                    "--dx": `${p.dx}px`,
-                    "--dy": `${p.dy}px`
-                  } as React.CSSProperties}
+        </div>
+        
+        <div className="rive-container-wrapper">
+          <div className="riveContainer">
+            {isRiveLoaded ? (
+              <Suspense fallback={<div className="rive-loading">캐릭터 로딩 중...</div>}>
+                <RiveComponentWrapper 
+                  ref={riveWrapperRef}
+                  src={getRivePath()}
+                  stateMachine="State Machine 1"
+                  artboard="Artboard"
+                  onPointerDown={handleFirstInteraction}
+                  numberValue={numberValue}
                 />
-              ))}
-            </div>
-          ))}
+              </Suspense>
+            ) : (
+              <div 
+                className="rive-placeholder" 
+                onClick={() => setIsRiveLoaded(true)}
+              >
+                클릭하여 캐릭터 로드
+              </div>
+            )}
+            {popups.map(popup => (
+              <span
+                key={popup.id}
+                className="popup"
+                style={{ top: popup.top, left: popup.left }}
+                onAnimationEnd={() => setPopups(old => old.filter(p => p.id !== popup.id))}
+              >
+                {popup.message}
+              </span>
+            ))}
+          </div>
         </div>
-        <div className="riveContainer">
-          {isRiveLoaded ? (
-            <Suspense fallback={<div className="rive-loading">캐릭터 로딩 중...</div>}>
-              <RiveComponentWrapper 
-                ref={riveWrapperRef}
-                src={getRivePath()}
-                stateMachine="State Machine 1"
-                artboard="Artboard"
-                onPointerDown={handleFirstInteraction}
-                numberValue={numberValue}
-              />
-            </Suspense>
-          ) : (
-            <div 
-              className="rive-placeholder" 
-              onClick={() => setIsRiveLoaded(true)}
-            >
-              클릭하여 캐릭터 로드
-            </div>
-          )}
-          {popups.map(popup => (
-            <span
-              key={popup.id}
-              className="popup"
-              style={{ top: popup.top, left: popup.left }}
-              onAnimationEnd={() => setPopups(old => old.filter(p => p.id !== popup.id))}
-            >
-              {popup.message}
-            </span>
-          ))}
-        </div>
+        
         <div className="buttonContainer">
           <button className="buttonSkin" 
             onClick={handleSkinChange}
-            style={{ backgroundColor: adjustColor(CHAR_COLORS[numberValue], 0.7) }}
             aria-label="스킨 변경">
-            <FontAwesomeIcon icon={faPaintBrush} /> 스킨 변경
+            <FontAwesomeIcon icon={faPaintBrush} />
           </button>
           <button className="buttonCharacter" 
             onClick={handleChangeCharacter}
-            style={{ backgroundColor: adjustColor(CHAR_COLORS[numberValue], 0.7) }}
             aria-label="캐릭터 변경">
-            <FontAwesomeIcon icon={faUser} /> 캐릭터 변경
+            <FontAwesomeIcon icon={faUser} />
           </button>
-          <div style={{ position: "relative", display: "inline-block", top: "10px" }}>
+          <div className="volume-control">
             <button className="buttonSpeaker" 
               onClick={() => setVolumeSliderVisible(prev => !prev)}
               aria-label="볼륨 조절">
@@ -386,14 +390,6 @@ const ClickerGame = () => {
                 value={volume}
                 onChange={(e) => setVolume(Number(e.target.value))}
                 aria-label="볼륨 조절 슬라이더"
-                style={{ 
-                  position: "absolute", 
-                  bottom: "230%",
-                  left: "50%", 
-                  transform: "translateX(-50%) rotate(-90deg)",
-                  width: "100px",
-                  background: adjustColor(CHAR_COLORS[numberValue], 0.7) // 캐릭터 배경보다 어두운 색
-                }}
               />
             )}
           </div>
