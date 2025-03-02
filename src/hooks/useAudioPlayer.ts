@@ -31,9 +31,23 @@ export function useAudioPlayer(
     
     loadingPromiseRef.current = new Promise<void>(async (resolve) => {
       try {
-        audioContextRef.current = new AudioContext();
+        // iOS/Safari 호환성 개선: 오디오 컨텍스트를 resume 상태로 시작
+        // any 타입 사용 대신 적절한 타입 지정
+        const AudioContextClass = window.AudioContext || 
+          (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+          
+        if (!AudioContextClass) {
+          console.error("AudioContext not supported in this browser");
+          return resolve();
+        }
         
-        // 병렬로 여러 오디오 로드 시작 (캐싱 활용)
+        audioContextRef.current = new AudioContextClass();
+        
+        if (audioContextRef.current.state === "suspended") {
+          await audioContextRef.current.resume();
+        }
+        
+        // 오디오 데이터 미리 로드
         const loadPromises = charSounds.map(async (url, index) => {
           try {
             // 캐시에 있는지 확인
@@ -55,6 +69,14 @@ export function useAudioPlayer(
         });
         
         await Promise.all(loadPromises);
+        
+        // 사일런트 오디오 재생 (일부 브라우저에서 오디오 활성화 트릭)
+        const silentBuffer = audioContextRef.current.createBuffer(1, 1, 22050);
+        const source = audioContextRef.current.createBufferSource();
+        source.buffer = silentBuffer;
+        source.connect(audioContextRef.current.destination);
+        source.start(0);
+        
         isInitializedRef.current = true;
         resolve();
       } catch (error) {
@@ -87,9 +109,15 @@ export function useAudioPlayer(
 
   const playSound = useCallback(
     async (index: number) => {
+      // 호출 즉시 오디오 초기화 시도 (이미 초기화된 경우는 무시됨)
+      if (!isInitializedRef.current) {
+        await initializeAudio();
+      }
+      
       if (!isReady || !soundEnabled || !isInitializedRef.current) return;
       if (volume === 0) return; // 볼륨이 0이면 소리를 재생하지 않음 (완전 침묵)
       try {
+        // 항상 resume 시도
         if (audioContextRef.current?.state === "suspended") {
           await audioContextRef.current.resume();
         }
@@ -147,7 +175,7 @@ export function useAudioPlayer(
         console.error("Sound playback error:", error);
       }
     },
-    [isReady, soundEnabled, fadeDurations, volume] // volume dependency 추가
+    [isReady, soundEnabled, fadeDurations, volume, initializeAudio] // volume dependency 추가
   );
 
   // 컴포넌트 언마운트 시 정리

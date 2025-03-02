@@ -5,14 +5,15 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faChartBar, faChevronUp, faChevronDown, faPaintBrush, faUser, faVolumeUp, faVolumeMute, faInfoCircle } from "@fortawesome/free-solid-svg-icons";
 import { faGithub } from "@fortawesome/free-brands-svg-icons";
 import { useAudioPlayer } from "../hooks/useAudioPlayer";
-import "./ClickerGame.css";
-import { Analytics } from "@vercel/analytics/react"; // Vercel Analytics 추가
+import { Analytics } from "@vercel/analytics/react";
 
-// Rive 컴포넌트 지연 로딩 및 타입 가져오기
-const RiveComponentWrapper = lazy(() => import('../components/RiveWrapper').then(mod => ({ default: mod.default })));
+// Rive 컴포넌트 지연 로딩 변경 - dynamic import로 수정
+const RiveComponentWrapper = lazy(() => 
+  import('../components/RiveWrapper')
+);
 import type { RiveWrapperHandle } from '../components/RiveWrapper';
 
-const GAME_VERSION = "1.2.0"; // 버전 업데이트
+const GAME_VERSION = "1.3.0"; // 버전 업데이트
 const CHAR_NAMES = ["텐코 시부키", "하나코 나나", "유즈하 리코", "아오쿠모 린"];
 const CHAR_SOUNDS = [
   "/asset/shibuki/debakbak.mp3",
@@ -26,9 +27,16 @@ const SPECIAL_THRESHOLDS: { [key: number]: number[] } = {
   0: [1000, 2000, 3000], // 텐코 시부키
   1: [1000, 2000, 3000], // 하나코 나나
   2: [1000, 2000, 3000], // 유즈하 리코
-  3: [1000, 2000, 3000] // 아오쿠모 린
+  3: [1000, 2000, 3000]  // 아오쿠모 린
 };
-type Popup = { id: number; top: string; left: string; message: string };
+type Popup = { 
+  id: number; 
+  top: string; 
+  left: string; 
+  message: string;
+  rotation: number; // 회전 각도 추가
+  scale: number;    // 크기 추가 
+};
 
 function adjustColor(hex: string, factor: number): string {
   const r = Math.min(255, Math.floor(parseInt(hex.slice(1,3), 16) * factor));
@@ -37,38 +45,16 @@ function adjustColor(hex: string, factor: number): string {
   return "#" + [r, g, b].map(c => c.toString(16).padStart(2, "0")).join("");
 }
 
-const getRandomPopupPosition = (): { top: string; left: string } => {
-  const sides = ["top", "bottom", "left", "right"];
-  const side = sides[Math.floor(Math.random() * sides.length)];
-  let top = "50%", left = "50%";
-  if (side === "top") {
-    top = `${Math.random() * 10 + 10}%`;
-    left = `${10 + Math.random() * 80}%`;
-  } else if (side === "bottom") {
-    top = `${Math.random() * 10 + 70}%`;
-    left = `${10 + Math.random() * 80}%`;
-  } else if (side === "left") {
-    left = `${Math.random() * 10 + 10}%`;
-    top = `${10 + Math.random() * 80}%`;
-  } else {
-    left = `${Math.random() * 10 + 70}%`;
-    top = `${10 + Math.random() * 80}%`;
-  }
-  return { top, left };
-};
-
 const ClickerGame = () => {
   const [clickCounts, setClickCounts] = useState<{ [key: number]: number }>(() => {
     try {
       if (typeof window !== "undefined") {
         const storedVersion = localStorage.getItem("gameVersion");
         const stored = localStorage.getItem("clickCounts");
-        
         // 버전이 다르거나 없으면 캐시를 초기화하되 클릭 통계는 유지
         if (!storedVersion || storedVersion !== GAME_VERSION) {
           console.log("게임 버전이 변경되어 캐시를 초기화합니다.");
           const tempClickCounts = stored ? JSON.parse(stored) : { 0: 0, 1: 0, 2: 0, 3: 0 };
-          
           // 모든 캐시 초기화
           for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
@@ -76,16 +62,13 @@ const ClickerGame = () => {
               localStorage.removeItem(key);
             }
           }
-          
           // 클릭 통계와 새 버전 저장
           localStorage.setItem("clickCounts", JSON.stringify(tempClickCounts));
           localStorage.setItem("gameVersion", GAME_VERSION);
-          
           return tempClickCounts;
-        }
-        
+        } 
         return stored ? JSON.parse(stored) : { 0: 0, 1: 0, 2: 0, 3: 0 };
-      }
+      } 
     } catch (error) {
       console.error("캐시 초기화 중 오류 발생:", error);
     }
@@ -114,90 +97,141 @@ const ClickerGame = () => {
   const [infoModalOpen, setInfoModalOpen] = useState(false);
   const [fireworks, setFireworks] = useState<{ id: number; particles: { dx: number; dy: number }[] }[]>([]);
   const [isRiveLoaded, setIsRiveLoaded] = useState(false);
-  const [isFirstInteraction, setIsFirstInteraction] = useState(true);
-
+  const [isLandscape, setIsLandscape] = useState(false);
   const clickTimestampsRef = useRef<number[]>([]);
   const isClickingRef = useRef(false);
   const fadeDurations = [1200, 1000, 1800, 1000];  // 캐릭터 별로 다른 fadeout duration (밀리초)
-
   // 새 커스텀 훅 사용
   const { playSound, initializeAudio } = useAudioPlayer(soundEnabled, fadeDurations, CHAR_SOUNDS, volume);
-
   // RiveWrapper의 ref 추가
   const riveWrapperRef = useRef<RiveWrapperHandle>(null);
-
   // riv 파일 URL에 버전 추가하는 함수
   const getRivePath = useCallback(() => {
     return `/asset/shibuki/shibuki.riv?v=${GAME_VERSION.replace(/\./g, '')}`;
   }, []);
-
   // clickCounts 로컬 저장 
   useEffect(() => {
     localStorage.setItem("clickCounts", JSON.stringify(clickCounts));
   }, [clickCounts]);
-
   // localStorage에 볼륨 저장
   useEffect(() => {
     localStorage.setItem("volume", volume.toString());
   }, [volume]);
-
   useEffect(() => {
     document.body.style.backgroundColor = CHAR_COLORS[numberValue];
     
-    // IntersectionObserver를 사용하여 Rive 컴포넌트 뷰포트에 보이면 로드
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          // 10ms 지연 후 Rive 로드 (초기 레이아웃 계산에 방해되지 않도록)
-          setTimeout(() => setIsRiveLoaded(true), 10);
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.1 }
-    );
+    // IntersectionObserver 코드 간소화
+    setTimeout(() => {
+      // 페이지 로드 즉시 Rive 컴포넌트 로드 시작
+      setIsRiveLoaded(true);
+    }, 500); // 약간의 지연 추가
     
-    const container = document.querySelector('.game-container');
-    if (container) {
-      observer.observe(container);
-    }
-
-    return () => observer.disconnect();
   }, [numberValue]);
+    
+  // 이벤트 핸들러 통합 (모든 클릭 이벤트 처리를 한 곳에서)
+  const clickAreaRef = useRef<HTMLDivElement>(null); // 클릭 영역 ref 추가
+  
+  // 업데이트된 팝업 위치 계산 함수 - Rive 컴포넌트 내부에 표시
+  const getRandomPopupPosition = useCallback((): { top: string; left: string } => {
+    if (!clickAreaRef.current) {
+      return { top: '50%', left: '50%' }; // 기본값
+    }
+    
+    // 가장자리에서 10-20% 안쪽으로 위치하도록 설정
+    const edgeBuffer = 0.1 + Math.random() * 0.1; // 10-20% 버퍼
+    
+    // 랜덤 위치 계산 (가장자리에서 안쪽으로)
+    const left = edgeBuffer + Math.random() * (1 - 2 * edgeBuffer);
+    const top = edgeBuffer + Math.random() * (1 - 2 * edgeBuffer);
+    
+    return { 
+      top: `${top * 100}%`, 
+      left: `${left * 100}%` 
+    };
+  }, []);
+  
+  // 첫 클릭 시 소리 재생 문제 해결을 위한 상태 추가
+  const isAudioInitializedRef = useRef(false);
+  const pendingPlayRef = useRef<number | null>(null);
 
-  const handleInteraction = useCallback((e: React.PointerEvent) => {
+  // Rive 로드 완료 후 오디오 사전 초기화 추가
+  useEffect(() => {
+    if (isRiveLoaded && !isAudioInitializedRef.current) {
+      initializeAudio().then(() => {
+        isAudioInitializedRef.current = true;
+        // 초기화 후 대기 중인 소리 재생 처리
+        if (pendingPlayRef.current !== null) {
+          playSound(pendingPlayRef.current);
+          pendingPlayRef.current = null;
+        }
+      }).catch(err => {
+        console.error("오디오 초기화 실패:", err);
+      });
+    }
+  }, [isRiveLoaded, initializeAudio, playSound]);
+
+  // 업데이트된 클릭 핸들러
+  const handleClickWithAnimation = useCallback((e: React.MouseEvent | React.PointerEvent) => {
     e.preventDefault();
+    
+    // 이미 클릭 상태면 무시
     if (isClickingRef.current) return;
     isClickingRef.current = true;
-
-    // 필요한 경우 ref를 통해 트리거 호출 가능
-    // if (riveWrapperRef.current) {
-    //   riveWrapperRef.current.fireTrigger();
-    // }
     
-    playSound(numberValue);
+    console.log("클릭 이벤트 감지!");
+    
+    // Rive 트리거 호출
+    if (riveWrapperRef.current) {
+      riveWrapperRef.current.fireTrigger();
+    }
+    
+    // 오디오 처리
+    if (isAudioInitializedRef.current) {
+      // 이미 초기화된 경우 바로 소리 재생
+      playSound(numberValue);
+    } else {
+      // 초기화되지 않은 경우 초기화하고 대기열에 추가
+      pendingPlayRef.current = numberValue;
+      initializeAudio().then(() => {
+        isAudioInitializedRef.current = true;
+        if (pendingPlayRef.current !== null) {
+          playSound(pendingPlayRef.current);
+          pendingPlayRef.current = null;
+        }
+      });
+    }
+    
+    // 카운트 증가 및 나머지 처리
     setClickCounts(prev => ({ ...prev, [numberValue]: (prev[numberValue] || 0) + 1 }));
     clickTimestampsRef.current.push(Date.now());
+    
+    // 시각 효과
     setRotateAngle(Math.random() < 0.5 ? 10 : -10);
     setAnimateCount(true);
     setTimeout(() => setAnimateCount(false), 300);
+    
+    // 팝업 메시지
     const { top, left } = getRandomPopupPosition();
     const popupId = Date.now();
-    setPopups(prev => [...prev, { id: popupId, top, left, message: CHAR_POPUP_MESSAGES[numberValue] }]);
-    const pointerUpHandler = () => {
+    const rotation = Math.random() * 30 - 15;
+    const scale = 0.8 + Math.random() * 0.4;
+    
+    setPopups(prev => [...prev, { 
+      id: popupId, 
+      top, 
+      left, 
+      message: CHAR_POPUP_MESSAGES[numberValue],
+      rotation,
+      scale
+    }]);
+    
+    // 클릭 상태 초기화
+    const upHandler = () => {
       isClickingRef.current = false;
-      window.removeEventListener("pointerup", pointerUpHandler);
+      window.removeEventListener("pointerup", upHandler);
     };
-    window.addEventListener("pointerup", pointerUpHandler);
-  }, [playSound, numberValue]);
-
-  // 최초 사용자 상호작용 시 오디오 초기화를 시도한 후 handleInteraction 호출
-  const handleFirstInteraction = useCallback(async (e: React.PointerEvent) => {
-    if (isFirstInteraction) {
-      await initializeAudio();
-      setIsFirstInteraction(false);
-    }
-    handleInteraction(e);
-  }, [initializeAudio, handleInteraction, isFirstInteraction]);
+    window.addEventListener("pointerup", upHandler);
+  }, [playSound, numberValue, initializeAudio, riveWrapperRef, getRandomPopupPosition]);
 
   // SPS (Stel Per Second, 초당 클릭 수) 계산
   useEffect(() => {
@@ -209,7 +243,6 @@ const ClickerGame = () => {
     }, 200);
     return () => clearInterval(interval);
   }, []);
-
   // 클릭 수 변경 시 모든 임계값 체크
   useEffect(() => {
     const currentCount = clickCounts[numberValue] || 0;
@@ -217,7 +250,7 @@ const ClickerGame = () => {
     thresholds.forEach(threshold => {
       if (currentCount === threshold && !specialTriggered[numberValue].includes(threshold)) {
         console.log(`${CHAR_NAMES[numberValue]}: 특수 이벤트 발생! (${threshold} 만큼 클릭)`);
-        setSpecialTriggered(prev => ({
+        setSpecialTriggered(prev => ({ 
           ...prev,
           [numberValue]: [...prev[numberValue], threshold],
         }));
@@ -250,43 +283,73 @@ const ClickerGame = () => {
   const handleOpenInfo = useCallback(() => {
     setInfoModalOpen(true);
   }, []);
+
   const handleCloseInfo = useCallback(() => {
     setInfoModalOpen(false);
   }, []);
 
+  // 볼륨 슬라이더 관련 상태
+  const [volumeSliderWidth, setVolumeSliderWidth] = useState(0);
+  const volumeSliderRef = useRef<HTMLInputElement>(null);
+  
+  // 볼륨 버튼 클릭 핸들러 개선 - duration은 CSS에서 관리
+  const handleVolumeClick = useCallback(() => {
+    setVolumeSliderVisible(prev => !prev);
+    
+    if (!volumeSliderVisible && volumeSliderRef.current) {
+      setVolumeSliderWidth(0);
+      requestAnimationFrame(() => {
+        setVolumeSliderWidth(100);
+      });
+    } else {
+      setVolumeSliderWidth(0);
+    }
+  }, [volumeSliderVisible]);
+
+  useEffect(() => {
+    const checkOrientation = () => {
+      setIsLandscape(window.innerWidth > window.innerHeight);
+    };
+    checkOrientation();
+    window.addEventListener("resize", checkOrientation);
+    return () => window.removeEventListener("resize", checkOrientation);
+  }, []);
+
   return (
     <>
-      <div className="sps-panel">
+      {/* SPS 패널 */}
+      <div className="fixed top-1 right-1 bg-semi-transparent-dark p-1 rounded-md text-white text-base z-10">
         <div>SPS: {avgSps.toFixed(2)}</div>
         <Analytics />
       </div>
-      <div className="stats-panel">
-        <div className="stats-header">
-            <div style={{ fontWeight: "bold" }}>
+
+      {/* 통계 패널 */}
+      <div className="fixed top-1 left-1 bg-semi-transparent-dark p-1 rounded-md text-white text-base z-10">
+        <div className="flex justify-between items-center">
+          <div className="font-bold">
             <FontAwesomeIcon icon={faChartBar} />
-            </div>
-          <button className="toggle-stats-button" 
+          </div>
+          <button 
+            className="bg-transparent border-0 text-white text-base cursor-pointer"
             onClick={() => setStatsOpen(prev => !prev)}
-            aria-label="통계 토글">
-            <FontAwesomeIcon icon={statsOpen ? faChevronUp : faChevronDown} />
+            aria-label="통계 토글"
+          >
+            {statsOpen ? <FontAwesomeIcon icon={faChevronUp} /> : <FontAwesomeIcon icon={faChevronDown} />}
           </button>
         </div>
         {statsOpen && (
           <>
+            {CHAR_NAMES.map((name, idx) => (
+              <div key={idx} className="flex justify-between items-center">
+                <span>{idx === 0 ? "시부키" : idx === 1 ? "나나" : idx === 2 ? "리코" : "린"}</span>
+                <span>{clickCounts[idx] || 0}</span>
+              </div>
+            ))}
             <div>
-              <span>시부키</span> <span>{clickCounts[0] || 0}</span>
-            </div>
-            <div>
-              <span>나나</span> <span>{clickCounts[1] || 0}</span>
-            </div>
-            <div>
-              <span>리코</span> <span>{clickCounts[2] || 0}</span>
-            </div>
-            <div>
-              <span>린</span> <span>{clickCounts[3] || 0}</span>
-            </div>
-            <div>
-              <button className="reset-button" onClick={handleResetStats}>
+              <button 
+                className="bg-transparent border-0 text-white text-inherit cursor-pointer p-0 underline"
+                onClick={handleResetStats}
+              >
                 통계 초기화
               </button>
             </div>
@@ -294,25 +357,30 @@ const ClickerGame = () => {
         )}
       </div>
 
-      <div className="container game-container">
-        <div className="top-content">
-          <div className="character-name">{CHAR_NAMES[numberValue]}</div>
-          <div className="clickCounterWrapper">
-            <div className="clickCounter" style={animateCount ? { transform: `scale(1.2) rotate(${rotateAngle}deg)` } : {}}>
+      {/* 메인 게임 컨테이너 - 전체 화면 높이 및 flex 구조 수정 */}
+      <div className="container w-full min-h-screen m-0 py-2.5 px-0 flex flex-col items-center justify-center max-w-full overflow-hidden">
+        {/* 상단 컨텐츠: 캐릭터 이름 및 카운터 */}
+        <div className="w-full max-w-36r flex flex-col items-center relative z-10 mb-4">
+          {/* 캐릭터 이름 */}
+          <div className="text-white text-3xl md:text-2xl xs:text-xl tiny:text-lg mb-1 leading-tight font-bold">
+            {CHAR_NAMES[numberValue]}
+          </div>
+          
+          {/* 클릭 카운터 */}
+          <div className="relative inline-block w-auto m-0">
+            <div 
+              className="text-6xl md:text-5xl xs:text-4xl tiny:text-3xl font-extrabold text-white transition-transform duration-300 select-none"
+              style={animateCount ? { transform: `scale(1.2) rotate(${rotateAngle}deg)` } : {}}
+            >
               {clickCounts[numberValue] || 0}
             </div>
+            
+            {/* 폭죽 효과 */}
             {fireworks.map(fw => (
               <div
                 key={fw.id}
-                className="fireworks-container"
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  width: "100%",
-                  height: "100%",
-                  "--bright-color": adjustColor(CHAR_COLORS[numberValue], 1.3)
-                } as React.CSSProperties}
+                className="fireworks-container pointer-events-none absolute top-0 left-0 w-full h-full"
+                style={{ "--bright-color": adjustColor(CHAR_COLORS[numberValue], 1.3) } as React.CSSProperties}
                 onAnimationEnd={() => setFireworks(old => old.filter(f => f.id !== fw.id))}
               >
                 {fw.particles.map((p, idx) => (
@@ -330,32 +398,52 @@ const ClickerGame = () => {
           </div>
         </div>
         
-        <div className="rive-container-wrapper">
-          <div className="riveContainer">
+        {/* Rive 컨테이너 - 짤림 문제 해결 및 중앙 정렬 */}
+        <div className="w-full flex justify-center items-center relative">
+          <div 
+            ref={clickAreaRef}
+            className="w-full max-w-36r aspect-square relative mx-auto md:max-w-[90%] 2xl:max-w-42r"
+            style={{ 
+              maxHeight: 'min(70vh, 600px)',  // 높이 제한을 vh와 절대값 중 작은 값으로 설정
+            }}
+          >
             {isRiveLoaded ? (
-              <Suspense fallback={<div className="rive-loading">캐릭터 로딩 중...</div>}>
+              <Suspense fallback={
+                <div className="w-full h-full flex items-center justify-center text-white text-2xl bg-semi-transparent rounded-xl cursor-pointer">
+                  캐릭터 로딩 중...
+                </div>
+              }>
                 <RiveComponentWrapper 
                   ref={riveWrapperRef}
                   src={getRivePath()}
                   stateMachine="State Machine 1"
                   artboard="Artboard"
-                  onPointerDown={handleFirstInteraction}
+                  onPointerDown={handleClickWithAnimation} 
                   numberValue={numberValue}
                 />
               </Suspense>
             ) : (
               <div 
-                className="rive-placeholder" 
+                className="w-full h-full flex items-center justify-center text-white text-2xl bg-semi-transparent rounded-xl cursor-pointer border-2 border-dashed border-opacity-30 border-white"
                 onClick={() => setIsRiveLoaded(true)}
               >
                 클릭하여 캐릭터 로드
               </div>
             )}
+            
+            {/* 팝업 메시지 - 스타일 및 애니메이션 개선 */}
             {popups.map(popup => (
               <span
                 key={popup.id}
-                className="popup"
-                style={{ top: popup.top, left: popup.left }}
+                className="popup text-2xl md:text-xl xs:text-base"
+                style={{ 
+                  top: popup.top, 
+                  left: popup.left, 
+                  transform: `rotate(${popup.rotation}deg) scale(${popup.scale})`,
+                  textShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                  fontSize: `calc(1em * ${popup.scale})`,
+                  fontWeight: 'bold' 
+                }}
                 onAnimationEnd={() => setPopups(old => old.filter(p => p.id !== popup.id))}
               >
                 {popup.message}
@@ -364,57 +452,120 @@ const ClickerGame = () => {
           </div>
         </div>
         
-        <div className="buttonContainer">
-          <button className="buttonSkin" 
+        {/* 버튼 컨테이너 - 위치 조정 */}
+        <div className="flex gap-3 md:gap-2.5 xs:gap-1.5 flex-wrap justify-center w-full max-w-lg p-0 px-2.5 relative z-10 mt-4 mb-3 md:mb-5 xs:mb-4 landscape:absolute landscape:right-0 landscape:top-1/2 landscape:-translate-y-1/2 landscape:flex-col landscape:w-auto landscape:h-auto landscape:m-0 landscape:gap-3 landscape:bg-semi-transparent landscape:p-1 landscape:rounded-l-md">
+          {/* 스킨 변경 버튼 */}
+          <button 
+            className="bg-transparent border-0 p-0 cursor-pointer text-2xl md:text-xl xs:text-lg text-white flex items-center justify-center transition-colors w-10 h-10 md:w-9 md:h-9 xs:w-8 xs:h-8 tiny:w-6 tiny:h-6 hover:text-gray-200"
             onClick={handleSkinChange}
-            aria-label="스킨 변경">
+            aria-label="스킨 변경"
+          >
             <FontAwesomeIcon icon={faPaintBrush} />
           </button>
-          <button className="buttonCharacter" 
+          
+          {/* 캐릭터 변경 버튼 */}
+          <button 
+            className="bg-transparent border-0 p-0 cursor-pointer text-2xl md:text-xl xs:text-lg text-white flex items-center justify-center transition-colors w-10 h-10 md:w-9 md:h-9 xs:w-8 xs:h-8 tiny:w-6 tiny:h-6 hover:text-gray-200"
             onClick={handleChangeCharacter}
-            aria-label="캐릭터 변경">
+            aria-label="캐릭터 변경"
+          >
             <FontAwesomeIcon icon={faUser} />
           </button>
-          <div className="volume-control">
-            <button className="buttonSpeaker" 
-              onClick={() => setVolumeSliderVisible(prev => !prev)}
-              aria-label="볼륨 조절">
+          
+          {/* 볼륨 컨트롤 - 개선된 레이아웃 */}
+          <div className="relative flex items-center">
+            <button 
+              className="bg-transparent border-0 p-0 cursor-pointer text-2xl md:text-xl xs:text-lg text-white flex items-center justify-center transition-colors w-10 h-10 md:w-9 md:h-9 xs:w-8 xs:h-8 tiny:w-6 tiny:h-6 hover:text-gray-200 z-20"
+              onClick={handleVolumeClick}
+              aria-label="볼륨 조절"
+            >
               <FontAwesomeIcon icon={volume === 0 ? faVolumeMute : faVolumeUp} />
             </button>
-            {volumeSliderVisible && (
+            
+            {/* 절대 위치로 변경, 버튼 레이아웃에 영향 X */}
+            <div 
+              className={`absolute overflow-hidden transition-all duration-300 ease-in-out flex items-center
+                ${volumeSliderVisible ? 'opacity-100' : 'opacity-0'}
+                ${isLandscape ? '-left-32 top-1/2 -translate-y-1/2' : 'left-full top-1/2 -translate-y-1/2'}
+              `}
+              style={{ 
+                width: volumeSliderVisible ? (
+                  isLandscape ? '8rem' : `${volumeSliderWidth}px`
+                ) : '0px'
+              }}
+            >
               <input
+                ref={volumeSliderRef}
                 type="range"
-                className="volume-slider"
+                className={`
+                  h-1.5 rounded-lg appearance-none bg-gray-700 
+                  landscape:w-24 landscape:transform landscape:rotate-0
+                  cursor-pointer w-24 mx-2
+                `}
+                style={{ 
+                  outline: 'none',
+                  boxShadow: '0 0 3px rgba(0,0,0,0.2)',
+                  accentColor: '#555',
+                }}
                 min="0"
                 max="100"
                 value={volume}
                 onChange={(e) => setVolume(Number(e.target.value))}
                 aria-label="볼륨 조절 슬라이더"
               />
-            )}
+            </div>
           </div>
-          <button className="buttonInfo" 
+          
+          {/* 정보 버튼 */}
+          <button 
+            className={`
+              bg-transparent border-0 p-0 cursor-pointer text-2xl
+              md:text-xl xs:text-lg text-white flex items-center justify-center transition-colors w-10 h-10 md:w-9 md:h-9 xs:w-8 xs:h-8 tiny:w-6 tiny:h-6 hover:text-gray-200
+              ${(!isLandscape && volumeSliderVisible) ? 'ml-24' : ''}
+            `}
             onClick={handleOpenInfo}
-            aria-label="정보 열기">
+            aria-label="정보 열기"
+            style={{ transition: 'margin 0.3s ease-in-out' }}
+          >
             <FontAwesomeIcon icon={faInfoCircle} />
           </button>
         </div>
       </div>
+
+      {/* 정보 모달 */}
       {infoModalOpen && (
         <>
-          <div className="info-overlay" onClick={handleCloseInfo} />
-          <div className="info-modal" role="dialog" aria-modal="true">
-            <button className="close-button" onClick={handleCloseInfo} aria-label="모달 닫기">×</button>
-            <h2>
-              <FontAwesomeIcon icon={faInfoCircle} style={{ marginRight: "0.5rem" }} />
+          <div 
+            className="fixed top-0 left-0 w-full h-full bg-black bg-opacity-50 z-[1100]" 
+            onClick={handleCloseInfo} 
+          />
+          <div 
+            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-4 rounded-lg shadow-lg z-[1200] w-[500px] max-w-[95%] text-black" 
+            role="dialog" 
+            aria-modal="true"
+          >
+            <button 
+              className="absolute top-2 right-3 bg-transparent border-0 text-lg cursor-pointer" 
+              onClick={handleCloseInfo} 
+              aria-label="모달 닫기"
+            >
+              ×
+            </button>
+            <h2 className="flex items-center text-xl font-bold mb-4">
+              <FontAwesomeIcon icon={faInfoCircle} className="mr-2" />
               스텔클릭커 정보
             </h2>
-            <p>스텔라이브 3기생들을 클릭하는 게임입니다.</p>
-            <p>여러 기능들을 경험해 보세요!</p>
-            <p>버전 {GAME_VERSION} </p>
-            <div style={{ position: "absolute", bottom: "10px", right: "10px" }}>
-              <a href="https://github.com/yulmu-catsetki/stelclicker" target="_blank" rel="noopener noreferrer">
-                <FontAwesomeIcon icon={faGithub}/>
+            <p className="mb-2">스텔라이브 3기생들을 클릭하는 게임입니다.</p>
+            <p className="mb-2">여러 기능들을 경험해 보세요!</p>
+            <p>버전 {GAME_VERSION}</p>
+            <div className="absolute bottom-2.5 right-2.5">
+              <a 
+                href="https://github.com/yulmu-catsetki/stelclicker" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-gray-700 hover:text-black"
+              >
+                <FontAwesomeIcon icon={faGithub} size="lg" />
               </a>
             </div>
           </div>

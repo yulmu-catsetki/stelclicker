@@ -40,3 +40,72 @@ body {
 body.brighten {
   filter: brightness(1.1);
 }
+
+/* 볼륨 슬라이더 스타일 개선 - 투명도 증가 */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  background: rgba(30, 30, 30, 0.3); /* 투명도 증가 */
+  border-radius: 3px;
+  outline: none;
+}
+
+/* Thumb 스타일 (Chrome/Safari) */
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.9); /* 더 밝은 컬러 */
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+/* Thumb 스타일 (Firefox) */
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.9);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+/* 팝업 애니메이션 개선 */
+@keyframes popupAnimate {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.8);
+  }
+  25% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  75% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.9);
+  }
+}
+
+.popup {
+  position: absolute;
+  color: white;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  animation: popupAnimate 1.2s ease-in-out forwards;
+  will-change: transform, opacity;
+  z-index: 5;
+  /* 팝업 텍스트를 더 잘 보이게 텍스트 테두리 추가 */
+  text-shadow: 
+    -1px -1px 0 rgba(0,0,0,0.3),
+    1px -1px 0 rgba(0,0,0,0.3),
+    -1px 1px 0 rgba(0,0,0,0.3),
+    1px 1px 0 rgba(0,0,0,0.3);
+}

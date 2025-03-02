@@ -24,28 +24,17 @@ const RiveWrapper = forwardRef<RiveWrapperHandle, RiveWrapperProps>(({
 }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [riveError, setRiveError] = useState(false); // 에러 상태 추가
 
   // 화면 크기 변경에 따른 Rive 크기 조정
   useEffect(() => {
     const updateDimensions = () => {
       if (containerRef.current) {
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-        const isLandscape = viewportWidth > viewportHeight;
+        const containerWidth = containerRef.current.clientWidth;
+        const containerHeight = containerRef.current.clientHeight;
         
-        let size: number;
-        if (isLandscape) {
-          // 가로 모드: 더 큰 크기로 조정
-          size = Math.min(viewportHeight * 0.70, viewportWidth * 0.55, 1000);
-        } else {
-          // 세로 모드: 더 큰 크기로 조정
-          size = Math.min(viewportWidth * 0.95, viewportHeight * 0.55, 1000);
-        }
-        
-        // 매우 작은 화면일 경우 추가 조정
-        if (viewportHeight < 400) {
-          size = Math.min(size, viewportWidth * 0.65);
-        }
+        // 더 작은 값에 맞춘 정사각형 크기 계산
+        const size = Math.min(containerWidth, containerHeight);
         
         setDimensions({ width: size, height: size });
       }
@@ -60,6 +49,7 @@ const RiveWrapper = forwardRef<RiveWrapperHandle, RiveWrapperProps>(({
     };
   }, []);
 
+  // useRive 훅을 호출할 때 onError 속성 제거하고 별도의 에러 처리 추가
   const { rive, RiveComponent } = useRive({
     src,
     stateMachines: stateMachine,
@@ -68,9 +58,14 @@ const RiveWrapper = forwardRef<RiveWrapperHandle, RiveWrapperProps>(({
     layout: new Layout({
       fit: Fit.Contain, 
       alignment: Alignment.Center
-    })
+    }),
+    // 에러 처리를 위한 onLoadError 콜백 추가
+    onLoadError: (err) => {
+      console.error("Rive 로딩 에러:", err);
+      setRiveError(true);
+    }
   });
-  
+
   const triggerInput = useStateMachineInput(rive, stateMachine, "Trigger 1");
   const numberInput = useStateMachineInput(rive, stateMachine, "number");
   
@@ -90,30 +85,58 @@ const RiveWrapper = forwardRef<RiveWrapperHandle, RiveWrapperProps>(({
     }
   }));
 
-  // 클릭 핸들러
+  // 클릭 핸들러 수정 - 기존 순서 반대로
   const handlePointerDown = (e: React.PointerEvent) => {
-    if (triggerInput) {
-      triggerInput.fire();
+    // Canvas 요소 내에서만 이벤트 처리
+    const target = e.target as HTMLElement;
+    if (target.tagName.toLowerCase() === 'canvas') {
+      // 먼저 트리거 실행
+      if (triggerInput) {
+        triggerInput.fire();
+      }
+      
+      // 그 다음 상위 컴포넌트에 이벤트 전달
+      onPointerDown(e);
     }
-    onPointerDown(e);
   };
 
   return (
     <div 
       ref={containerRef} 
+      className="w-full h-full" 
       style={{ 
-        width: dimensions.width > 0 ? `${dimensions.width}px` : '100%', 
-        height: dimensions.height > 0 ? `${dimensions.height}px` : '100%',
-        margin: '0 auto'
+        width: '100%', 
+        height: '100%',
+        position: 'relative',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center'
       }}
     >
-      <RiveComponent 
-        onPointerDown={handlePointerDown}
-        style={{ 
-          width: '100%', 
-          height: '100%'
-        }}
-      />
+      {!riveError ? (
+        <div
+          style={{
+            width: dimensions.width > 0 ? `${dimensions.width}px` : '100%',
+            height: dimensions.height > 0 ? `${dimensions.height}px` : '100%',
+            margin: '0 auto'
+          }}
+        >
+          <RiveComponent 
+            onPointerDown={handlePointerDown}
+            style={{ 
+              width: '100%', 
+              height: '100%',
+              cursor: 'pointer',
+              display: 'block',
+              outline: 'none'
+            }}
+          />
+        </div>
+      ) : (
+        <div className="w-full h-full flex items-center justify-center bg-red-500 bg-opacity-20 rounded-xl text-white">
+          캐릭터를 불러올 수 없습니다
+        </div>
+      )}
     </div>
   );
 });
