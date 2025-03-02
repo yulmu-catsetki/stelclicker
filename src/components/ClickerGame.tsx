@@ -13,7 +13,7 @@ const RiveComponentWrapper = lazy(() =>
 );
 import type { RiveWrapperHandle } from '../components/RiveWrapper';
 
-const GAME_VERSION = "1.3.1"; // 버전 업데이트
+const GAME_VERSION = "1.3.2"; // 버전 업데이트
 const CHAR_NAMES = ["텐코 시부키", "하나코 나나", "유즈하 리코", "아오쿠모 린"];
 const CHAR_SOUNDS = [
   "/asset/shibuki/debakbak.mp3",
@@ -153,42 +153,157 @@ const ClickerGame = () => {
   // 첫 클릭 시 소리 재생 문제 해결을 위한 상태 추가
   const isAudioInitializedRef = useRef(false);
   const pendingPlayRef = useRef<number | null>(null);
+  const touchStartPositionRef = useRef<{ x: number, y: number } | null>(null);
 
-  // 페이지 로드 시 오디오 시스템 준비
+  // 페이지 로드 시 오디오 시스템 미리 초기화
   useEffect(() => {
-    if (isRiveLoaded && !isAudioInitializedRef.current) {
+    // 컴포넌트 마운트 시 오디오 초기화 시작
+    if (!isAudioInitializedRef.current) {
+      console.log("페이지 로드 - 오디오 시스템 준비");
+      
+      // 모든 사용자 상호작용을 감지하는 이벤트 핸들러 추가
       const userInteractionHandler = async () => {
+        if (isAudioInitializedRef.current) return; // 이미 초기화되었다면 무시
+        
         try {
+          console.log("사용자 상호작용 감지 - 오디오 초기화 시작");
           await initializeAudio();
           isAudioInitializedRef.current = true;
+          console.log("오디오 초기화 완료");
           
           // 초기화 후 대기 중인 소리 재생 처리
           if (pendingPlayRef.current !== null) {
+            console.log(`대기 중이던 사운드(${pendingPlayRef.current}) 재생`);
             playSound(pendingPlayRef.current);
             pendingPlayRef.current = null;
           }
           
           // 한 번만 실행되도록 이벤트 리스너 제거
-          ['click', 'touchstart', 'pointerdown'].forEach(event => {
-            document.removeEventListener(event, userInteractionHandler);
+          ['click', 'touchstart', 'touchend', 'pointerdown', 'mousedown'].forEach(event => {
+            document.removeEventListener(event, userInteractionHandler, { capture: true });
           });
         } catch (err) {
           console.warn("오디오 초기화 실패:", err);
         }
       };
       
-      // 사용자 상호작용을 감지하는 이벤트 리스너 추가
-      ['click', 'touchstart', 'pointerdown'].forEach(event => {
-        document.addEventListener(event, userInteractionHandler, { once: true });
+      // 사용자 상호작용을 감지하는 이벤트 리스너 추가 (캡처링 단계에서 실행)
+      ['click', 'touchstart', 'touchend', 'pointerdown', 'mousedown'].forEach(event => {
+        document.addEventListener(event, userInteractionHandler, { capture: true, once: true });
       });
       
+      // 컴포넌트가 언마운트될 때 이벤트 리스너 제거
       return () => {
-        ['click', 'touchstart', 'pointerdown'].forEach(event => {
-          document.removeEventListener(event, userInteractionHandler);
+        ['click', 'touchstart', 'touchend', 'pointerdown', 'mousedown'].forEach(event => {
+          document.removeEventListener(event, userInteractionHandler, { capture: true });
         });
       };
     }
-  }, [isRiveLoaded, initializeAudio, playSound]);
+  }, [initializeAudio, playSound]);
+
+  // 터치 이벤트 처리 강화
+  useEffect(() => {
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        touchStartPositionRef.current = {
+          x: e.touches[0].clientX,
+          y: e.touches[0].clientY
+        };
+      }
+    };
+
+    const handleTouchEnd = async (e: TouchEvent) => {
+      // 클릭 상태인 경우 무시
+      if (isClickingRef.current) return;
+      
+      if (touchStartPositionRef.current && e.changedTouches.length === 1) {
+        const touch = e.changedTouches[0];
+        const deltaX = Math.abs(touch.clientX - touchStartPositionRef.current.x);
+        const deltaY = Math.abs(touch.clientY - touchStartPositionRef.current.y);
+        
+        // 5px 이내의 움직임은 클릭/탭으로 간주 (드래그 방지)
+        if (deltaX < 5 && deltaY < 5) {
+          // 클릭 영역 내부인지 확인
+          if (clickAreaRef.current) {
+            const rect = clickAreaRef.current.getBoundingClientRect();
+            if (
+              touch.clientX >= rect.left &&
+              touch.clientX <= rect.right &&
+              touch.clientY >= rect.top &&
+              touch.clientY <= rect.bottom
+            ) {
+              // Rive 캐릭터 영역 내 터치 확인
+              console.log("캐릭터 영역 터치 감지");
+              
+              // 오디오 초기화 및 재생 로직
+              if (!isAudioInitializedRef.current) {
+                console.log("터치 이벤트에서 오디오 초기화");
+                pendingPlayRef.current = numberValue;
+                await initializeAudio()
+                  .then(() => {
+                    isAudioInitializedRef.current = true;
+                    playSound(numberValue);
+                    pendingPlayRef.current = null;
+                  })
+                  .catch(err => {
+                    console.error("터치 이벤트에서 오디오 초기화 오류:", err);
+                  });
+              } else {
+                // 이미 초기화된 경우
+                playSound(numberValue);
+              }
+              
+              // 카운터 증가 및 시각 효과
+              setClickCounts(prev => ({ ...prev, [numberValue]: (prev[numberValue] || 0) + 1 }));
+              clickTimestampsRef.current.push(Date.now());
+              
+              // Rive 트리거 호출
+              if (riveWrapperRef.current) {
+                riveWrapperRef.current.fireTrigger();
+              }
+              
+              // 시각 효과
+              setRotateAngle(Math.random() < 0.5 ? 10 : -10);
+              setAnimateCount(true);
+              setTimeout(() => setAnimateCount(false), 300);
+              
+              // 팝업 메시지
+              const { top, left } = getRandomPopupPosition();
+              const popupId = Date.now();
+              const rotation = Math.random() * 30 - 15;
+              const scale = 0.8 + Math.random() * 0.4;
+              
+              setPopups(prev => [...prev, { 
+                id: popupId, 
+                top, 
+                left, 
+                message: CHAR_POPUP_MESSAGES[numberValue],
+                rotation,
+                scale
+              }]);
+            }
+          }
+        }
+      }
+      
+      // 터치 위치 초기화
+      touchStartPositionRef.current = null;
+    };
+
+    // 터치 이벤트 리스너 등록
+    if (clickAreaRef.current) {
+      clickAreaRef.current.addEventListener('touchstart', handleTouchStart);
+      clickAreaRef.current.addEventListener('touchend', handleTouchEnd);
+    }
+
+    return () => {
+      // 컴포넌트 언마운트 시 이벤트 리스너 제거
+      if (clickAreaRef.current) {
+        clickAreaRef.current.removeEventListener('touchstart', handleTouchStart);
+        clickAreaRef.current.removeEventListener('touchend', handleTouchEnd);
+      }
+    };
+  }, [numberValue, getRandomPopupPosition, initializeAudio, playSound]);
 
   // 업데이트된 클릭 핸들러
   const handleClickWithAnimation = useCallback((e: React.MouseEvent | React.PointerEvent) => {
@@ -198,7 +313,7 @@ const ClickerGame = () => {
     if (isClickingRef.current) return;
     isClickingRef.current = true;
     
-    console.log("클릭 이벤트 감지!");
+    console.log("클릭/포인터 이벤트 감지!");
     
     // Rive 트리거 호출
     if (riveWrapperRef.current) {
@@ -208,18 +323,21 @@ const ClickerGame = () => {
     // 오디오 처리 - 사용자 상호작용 내에서 오디오 초기화 및 재생
     if (!isAudioInitializedRef.current) {
       // 아직 초기화되지 않았다면, 초기화 후 재생
+      console.log("클릭 핸들러에서 오디오 초기화");
       pendingPlayRef.current = numberValue;
       initializeAudio()
         .then(() => {
           isAudioInitializedRef.current = true;
+          console.log("클릭 핸들러에서 오디오 초기화 성공");
           playSound(numberValue);
           pendingPlayRef.current = null;
         })
         .catch(err => {
-          console.error("오디오 초기화 중 오류:", err);
+          console.error("클릭 핸들러에서 오디오 초기화 오류:", err);
         });
     } else {
       // 이미 초기화된 경우 바로 소리 재생
+      console.log("이미 초기화된 상태에서 소리 재생");
       playSound(numberValue);
     }
     
@@ -231,7 +349,7 @@ const ClickerGame = () => {
     setRotateAngle(Math.random() < 0.5 ? 10 : -10);
     setAnimateCount(true);
     setTimeout(() => setAnimateCount(false), 300);
-    
+
     // 팝업 메시지
     const { top, left } = getRandomPopupPosition();
     const popupId = Date.now();
@@ -349,7 +467,7 @@ const ClickerGame = () => {
       <div className="fixed top-1 left-1 bg-semi-transparent-dark p-1 rounded-md text-white text-base z-10">
         <div className="flex justify-between items-center">
           <div className="font-bold">
-            <FontAwesomeIcon icon={faChartBar} />
+            <FontAwesomeIcon icon={faChartBar} /> 통계
           </div>
           <button 
             className="bg-transparent border-0 text-white text-base cursor-pointer"
