@@ -13,7 +13,7 @@ const RiveComponentWrapper = lazy(() =>
 );
 import type { RiveWrapperHandle } from '../components/RiveWrapper';
 
-const GAME_VERSION = "1.3.0"; // 버전 업데이트
+const GAME_VERSION = "1.3.1"; // 버전 업데이트
 const CHAR_NAMES = ["텐코 시부키", "하나코 나나", "유즈하 리코", "아오쿠모 린"];
 const CHAR_SOUNDS = [
   "/asset/shibuki/debakbak.mp3",
@@ -154,19 +154,39 @@ const ClickerGame = () => {
   const isAudioInitializedRef = useRef(false);
   const pendingPlayRef = useRef<number | null>(null);
 
-  // Rive 로드 완료 후 오디오 사전 초기화 추가
+  // 페이지 로드 시 오디오 시스템 준비
   useEffect(() => {
     if (isRiveLoaded && !isAudioInitializedRef.current) {
-      initializeAudio().then(() => {
-        isAudioInitializedRef.current = true;
-        // 초기화 후 대기 중인 소리 재생 처리
-        if (pendingPlayRef.current !== null) {
-          playSound(pendingPlayRef.current);
-          pendingPlayRef.current = null;
+      const userInteractionHandler = async () => {
+        try {
+          await initializeAudio();
+          isAudioInitializedRef.current = true;
+          
+          // 초기화 후 대기 중인 소리 재생 처리
+          if (pendingPlayRef.current !== null) {
+            playSound(pendingPlayRef.current);
+            pendingPlayRef.current = null;
+          }
+          
+          // 한 번만 실행되도록 이벤트 리스너 제거
+          ['click', 'touchstart', 'pointerdown'].forEach(event => {
+            document.removeEventListener(event, userInteractionHandler);
+          });
+        } catch (err) {
+          console.warn("오디오 초기화 실패:", err);
         }
-      }).catch(err => {
-        console.error("오디오 초기화 실패:", err);
+      };
+      
+      // 사용자 상호작용을 감지하는 이벤트 리스너 추가
+      ['click', 'touchstart', 'pointerdown'].forEach(event => {
+        document.addEventListener(event, userInteractionHandler, { once: true });
       });
+      
+      return () => {
+        ['click', 'touchstart', 'pointerdown'].forEach(event => {
+          document.removeEventListener(event, userInteractionHandler);
+        });
+      };
     }
   }, [isRiveLoaded, initializeAudio, playSound]);
 
@@ -185,20 +205,22 @@ const ClickerGame = () => {
       riveWrapperRef.current.fireTrigger();
     }
     
-    // 오디오 처리
-    if (isAudioInitializedRef.current) {
+    // 오디오 처리 - 사용자 상호작용 내에서 오디오 초기화 및 재생
+    if (!isAudioInitializedRef.current) {
+      // 아직 초기화되지 않았다면, 초기화 후 재생
+      pendingPlayRef.current = numberValue;
+      initializeAudio()
+        .then(() => {
+          isAudioInitializedRef.current = true;
+          playSound(numberValue);
+          pendingPlayRef.current = null;
+        })
+        .catch(err => {
+          console.error("오디오 초기화 중 오류:", err);
+        });
+    } else {
       // 이미 초기화된 경우 바로 소리 재생
       playSound(numberValue);
-    } else {
-      // 초기화되지 않은 경우 초기화하고 대기열에 추가
-      pendingPlayRef.current = numberValue;
-      initializeAudio().then(() => {
-        isAudioInitializedRef.current = true;
-        if (pendingPlayRef.current !== null) {
-          playSound(pendingPlayRef.current);
-          pendingPlayRef.current = null;
-        }
-      });
     }
     
     // 카운트 증가 및 나머지 처리
