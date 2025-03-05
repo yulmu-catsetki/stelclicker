@@ -6,6 +6,7 @@ import React, {
   useCallback,
   Suspense,
   lazy,
+  useMemo,
 } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -46,6 +47,13 @@ const ClickerGame: React.FC = () => {
   // 팝업 메시지 훅
   const { popups, addPopup, removePopup } = usePopupMessage();
 
+  // 메모이제이션된 현재 캐릭터 정보
+  const currentCharacter = gameState.currentCharacter;
+  const characterInfo = useMemo(
+    () => CHARACTER_INFO[currentCharacter],
+    [currentCharacter]
+  );
+
   // 오디오 플레이어 훅
   const { playSound, initializeAudio } = useAudioPlayer(
     true,
@@ -77,19 +85,20 @@ const ClickerGame: React.FC = () => {
     if (isClickingRef.current) return;
     isClickingRef.current = true;
 
-    const currentCharacter = gameState.currentCharacter;
-    const characterInfo = CHARACTER_INFO[currentCharacter];
-
     // 클릭 카운트 증가
     incrementClickCount();
 
     // 클릭 타임스탬프 추가 및 SPS 계산
     const now = Date.now();
-    clickTimestampsRef.current.push(now);
-    const recentClicks = clickTimestampsRef.current.filter(
-      (ts) => now - ts <= 1000
-    );
-    const currentSps = recentClicks.length;
+    const timestamps = clickTimestampsRef.current;
+    timestamps.push(now);
+    
+    // 1초가 지난 타임스탬프는 제거
+    while (timestamps.length > 0 && now - timestamps[0] > 1000) {
+      timestamps.shift();
+    }
+    
+    const currentSps = timestamps.length;
     updateAvgSps(currentSps);
 
     // 오디오 초기화 및 재생
@@ -119,7 +128,6 @@ const ClickerGame: React.FC = () => {
 
     // 팝업 메시지 추가
     if (clickAreaRef.current) {
-      // Use a type assertion to ensure non-null ref
       addPopup(
         characterInfo.popupMessage,
         clickAreaRef as React.RefObject<HTMLDivElement>
@@ -133,24 +141,32 @@ const ClickerGame: React.FC = () => {
     };
     window.addEventListener("pointerup", upHandler);
   }, [
-    gameState.currentCharacter,
+    currentCharacter,
     incrementClickCount,
     updateAvgSps,
     initializeAudio,
     playSound,
     addPopup,
+    characterInfo.popupMessage,
   ]);
 
   // 볼륨 및 기타 부수 효과
   useEffect(() => {
-    document.body.style.backgroundColor =
-      CHARACTER_INFO[gameState.currentCharacter].color;
+    document.body.style.backgroundColor = characterInfo.color;
 
-    // Rive 컴포넌트 로딩
-    setTimeout(() => setIsRiveLoaded(true), 500);
-  }, [gameState.currentCharacter]);
+    // cleanup 함수
+    return () => {
+      document.body.style.backgroundColor = '';
+    };
+  }, [characterInfo.color]);
 
-  // 기타 핸들러들
+  // Rive 컴포넌트 로딩 - 한 번만 실행
+  useEffect(() => {
+    const timer = setTimeout(() => setIsRiveLoaded(true), 500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // 기타 핸들러들 - 메모이제이션
   const handleOpenInfo = useCallback(() => setInfoModalOpen(true), []);
   const handleCloseInfo = useCallback(() => setInfoModalOpen(false), []);
   const handleResetStats = useCallback(() => {
@@ -163,6 +179,33 @@ const ClickerGame: React.FC = () => {
     (e: React.ChangeEvent<HTMLInputElement>) => {
       setVolume(Number(e.target.value));
     },
+    []
+  );
+
+  const toggleStatsOpen = useCallback(() => {
+    setStatsOpen(prev => !prev);
+  }, []);
+
+  const toggleVolumeSlider = useCallback(() => {
+    setVolumeSliderVisible(prev => !prev);
+  }, []);
+
+  // 통계 패널에 표시할 캐릭터 목록 메모이제이션
+  const charactersList = useMemo(() => 
+    Object.values(Character)
+      .filter((char): char is number => typeof char === "number")
+      .map((char) => (
+        <div key={char} className="flex justify-between items-center">
+          <span>{CHARACTER_INFO[char as Character].name}</span>
+          <span>{gameState.clickCounts[char as Character] || 0}</span>
+        </div>
+      )),
+    [gameState.clickCounts]
+  );
+
+  // Rive 컴포넌트의 URL 메모이제이션
+  const riveComponentUrl = useMemo(() => 
+    `/asset/shibuki/shibuki.riv?v=${GAME_VERSION.replace(/\./g, "")}`,
     []
   );
 
@@ -182,26 +225,15 @@ const ClickerGame: React.FC = () => {
           </div>
           <button
             className="bg-transparent border-0 text-white text-base cursor-pointer"
-            onClick={() => setStatsOpen((prev) => !prev)}
+            onClick={toggleStatsOpen}
             aria-label="통계 토글"
           >
-            {statsOpen ? (
-              <FontAwesomeIcon icon={faChevronUp} />
-            ) : (
-              <FontAwesomeIcon icon={faChevronDown} />
-            )}
+            <FontAwesomeIcon icon={statsOpen ? faChevronUp : faChevronDown} />
           </button>
         </div>
         {statsOpen && (
           <>
-            {Object.values(Character)
-              .filter((char) => typeof char === "number")
-              .map((char) => (
-                <div key={char} className="flex justify-between items-center">
-                  <span>{CHARACTER_INFO[char as Character].name}</span>
-                  <span>{gameState.clickCounts[char as Character] || 0}</span>
-                </div>
-              ))}
+            {charactersList}
             <div>
               <button
                 className="bg-transparent border-0 text-white text-inherit cursor-pointer p-0 underline"
@@ -220,7 +252,7 @@ const ClickerGame: React.FC = () => {
         <div className="w-full max-w-36r flex flex-col items-center relative z-10 mb-4">
           {/* 캐릭터 이름 */}
           <div className="text-white text-3xl md:text-2xl xs:text-xl tiny:text-lg mb-1 leading-tight font-bold">
-            {CHARACTER_INFO[gameState.currentCharacter].name}
+            {characterInfo.name}
           </div>
 
           {/* 클릭 카운터 */}
@@ -230,10 +262,10 @@ const ClickerGame: React.FC = () => {
               style={
                 animateCount
                   ? { transform: `scale(1.2) rotate(${rotateAngle}deg)` }
-                  : {}
+                  : undefined
               }
             >
-              {gameState.clickCounts[gameState.currentCharacter] || 0}
+              {gameState.clickCounts[currentCharacter] || 0}
             </div>
           </div>
         </div>
@@ -257,14 +289,11 @@ const ClickerGame: React.FC = () => {
               >
                 <RiveComponentWrapper
                   ref={riveWrapperRef}
-                  src={`/asset/shibuki/shibuki.riv?v=${GAME_VERSION.replace(
-                    /\./g,
-                    ""
-                  )}`}
+                  src={riveComponentUrl}
                   stateMachine="State Machine 1"
                   artboard="Artboard"
                   onPointerDown={handleClick}
-                  numberValue={gameState.currentCharacter}
+                  numberValue={currentCharacter}
                 />
               </Suspense>
             ) : (
@@ -280,7 +309,7 @@ const ClickerGame: React.FC = () => {
             <PopupMessage
               popups={popups}
               onRemove={removePopup}
-              characterColor={CHARACTER_INFO[gameState.currentCharacter].color}
+              characterColor={characterInfo.color}
             />
           </div>
         </div>
@@ -300,7 +329,7 @@ const ClickerGame: React.FC = () => {
           <div className="relative flex items-center">
             <button
               className="bg-transparent border-0 p-0 cursor-pointer text-2xl md:text-xl xs:text-lg text-white flex items-center justify-center transition-colors w-10 h-10 md:w-9 md:h-9 xs:w-8 xs:h-8 tiny:w-6 tiny:h-6 hover:text-gray-200 z-20"
-              onClick={() => setVolumeSliderVisible((prev) => !prev)}
+              onClick={toggleVolumeSlider}
               aria-label="볼륨 조절"
             >
               <FontAwesomeIcon

@@ -1,5 +1,5 @@
 // useGameState.ts
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Character } from '../components/models/constants';
 
 interface GameState {
@@ -20,6 +20,8 @@ export function useGameState() {
     avgSps: 0
   });
 
+  const clickTimestampsRef = useRef<number[]>([]);
+
   const incrementClickCount = useCallback(() => {
     setGameState(prev => ({
       ...prev,
@@ -28,6 +30,7 @@ export function useGameState() {
         [prev.currentCharacter]: (prev.clickCounts[prev.currentCharacter] || 0) + 1
       }
     }));
+    clickTimestampsRef.current.push(Date.now());
   }, []);
 
   const changeCharacter = useCallback(() => {
@@ -54,7 +57,19 @@ export function useGameState() {
         [Character.AokumoriRin]: 0
       }
     }));
+    clickTimestampsRef.current = [];
   }, []);
+
+  // SPS (Stel Per Second, 초당 클릭 수) 계산
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      clickTimestampsRef.current = clickTimestampsRef.current.filter(ts => now - ts <= 1000); // 최근 1초 클릭 수 계산
+      const currentSps = clickTimestampsRef.current.length;
+      updateAvgSps(currentSps); // 지수 가중 이동 평균 계산 (0.9, 0.1은 가중치)
+    }, 200);
+    return () => clearInterval(interval);
+  }, [updateAvgSps]);
 
   return {
     gameState,
