@@ -117,11 +117,14 @@ const ClickerGame: React.FC = () => {
     setAnimateCount(true);
     setTimeout(() => setAnimateCount(false), 300);
 
-  // 팝업 메시지 추가
-  if (clickAreaRef.current) {
-    // Use a type assertion to ensure non-null ref
-    addPopup(characterInfo.popupMessage, clickAreaRef as React.RefObject<HTMLDivElement>);
-  }
+    // 팝업 메시지 추가
+    if (clickAreaRef.current) {
+      // Use a type assertion to ensure non-null ref
+      addPopup(
+        characterInfo.popupMessage,
+        clickAreaRef as React.RefObject<HTMLDivElement>
+      );
+    }
 
     // 클릭 상태 초기화
     const upHandler = () => {
@@ -129,7 +132,14 @@ const ClickerGame: React.FC = () => {
       window.removeEventListener("pointerup", upHandler);
     };
     window.addEventListener("pointerup", upHandler);
-  }, [gameState.currentCharacter, incrementClickCount, updateAvgSps, initializeAudio, playSound, addPopup]);
+  }, [
+    gameState.currentCharacter,
+    incrementClickCount,
+    updateAvgSps,
+    initializeAudio,
+    playSound,
+    addPopup,
+  ]);
 
   // 볼륨 및 기타 부수 효과
   useEffect(() => {
@@ -238,10 +248,12 @@ const ClickerGame: React.FC = () => {
             }}
           >
             {isRiveLoaded ? (
-                <div className="w-full h-full flex items-center justify-center text-white text-2xl bg-semi-transparent rounded-xl cursor-pointer">
-                  캐릭터 로딩 중...
               <Suspense
                 fallback={
+                  <div className="w-full h-full flex items-center justify-center text-white text-2xl bg-semi-transparent rounded-xl cursor-pointer">
+                    캐릭터 로딩 중...
+                  </div>
+                }
               >
                 <RiveComponentWrapper
                   ref={riveWrapperRef}
@@ -263,8 +275,6 @@ const ClickerGame: React.FC = () => {
                 클릭하여 캐릭터 로드
               </div>
             )}
-                  left: popup.left, 
-                  transform: `rotate(${popup.rotation}deg) scale(${popup.scale})`,
 
             {/* 팝업 메시지 */}
             <PopupMessage
@@ -274,56 +284,49 @@ const ClickerGame: React.FC = () => {
             />
           </div>
         </div>
-        
+
         {/* 버튼 컨테이너 - 위치 조정 */}
         <div className="flex gap-3 md:gap-2.5 xs:gap-1.5 flex-wrap justify-center w-full max-w-lg p-0 px-2.5 relative z-10 mt-4 mb-3 md:mb-5 xs:mb-4 landscape:absolute landscape:right-0 landscape:top-1/2 landscape:-translate-y-1/2 landscape:flex-col landscape:w-auto landscape:h-auto landscape:m-0 landscape:gap-3 landscape:bg-semi-transparent landscape:p-1 landscape:rounded-l-md">
-          
           {/* 캐릭터 변경 버튼 */}
+          <button
             className="bg-transparent border-0 p-0 cursor-pointer text-2xl md:text-xl xs:text-lg text-white flex items-center justify-center transition-colors w-10 h-10 md:w-9 md:h-9 xs:w-8 xs:h-8 tiny:w-6 tiny:h-6 hover:text-gray-200"
             onClick={changeCharacter}
             aria-label="캐릭터 변경"
           >
             <FontAwesomeIcon icon={faUser} />
           </button>
-          
 
           {/* 볼륨 컨트롤 */}
           <div className="relative flex items-center">
-                  h-1.5 rounded-lg appearance-none bg-gray-700 
-                  cursor-pointer w-24 mx-2
-                style={{ 
-                  boxShadow: '0 0 3px rgba(0,0,0,0.2)',
-                  accentColor: '#555',
-                }}
-      <button
-        className="bg-transparent border-0 p-0 cursor-pointer text-2xl md:text-xl xs:text-lg text-white flex items-center justify-center transition-colors w-10 h-10 md:w-9 md:h-9 xs:w-8 xs:h-8 tiny:w-6 tiny:h-6 hover:text-gray-200 z-20"
-        onClick={() => setVolumeSliderVisible((prev) => !prev)}
-        aria-label="볼륨 조절"
-      >
-        <FontAwesomeIcon
-          icon={volume === 0 ? faVolumeMute : faVolumeUp}
-        />
-      </button>
-      
-      <div 
-        className="volume-slider-container overflow-hidden transition-all duration-300 ease-in-out"
-        style={{
-          width: volumeSliderVisible ? '96px' : '0px',
-          opacity: volumeSliderVisible ? 1 : 0,
-          marginLeft: volumeSliderVisible ? '8px' : '0px'
-        }}
-      >
-        <input
-          type="range"
-          className="h-1.5 rounded-lg appearance-none bg-gray-700 cursor-pointer w-24"
-          min="0"
-          max="100"
-          value={volume}
-          onChange={handleVolumeChange}
-          aria-label="볼륨 조절 슬라이더"
-        />
-      </div>
-      </div>
+            <button
+              className="bg-transparent border-0 p-0 cursor-pointer text-2xl md:text-xl xs:text-lg text-white flex items-center justify-center transition-colors w-10 h-10 md:w-9 md:h-9 xs:w-8 xs:h-8 tiny:w-6 tiny:h-6 hover:text-gray-200 z-20"
+              onClick={() => setVolumeSliderVisible((prev) => !prev)}
+              aria-label="볼륨 조절"
+            >
+              <FontAwesomeIcon
+                icon={volume === 0 ? faVolumeMute : faVolumeUp}
+              />
+            </button>
+
+            <div
+              className="volume-slider-container overflow-hidden transition-all duration-300 ease-in-out"
+              style={{
+                width: volumeSliderVisible ? "96px" : "0px",
+                opacity: volumeSliderVisible ? 1 : 0,
+                marginLeft: volumeSliderVisible ? "8px" : "0px",
+              }}
+            >
+              <input
+                type="range"
+                className="h-1.5 rounded-lg appearance-none bg-gray-700 cursor-pointer w-24"
+                min="0"
+                max="100"
+                value={volume}
+                onChange={handleVolumeChange}
+                aria-label="볼륨 조절 슬라이더"
+              />
+            </div>
+          </div>
           {/* 정보 버튼 */}
           <button
             className="bg-transparent border-0 p-0 cursor-pointer text-2xl md:text-xl xs:text-lg text-white flex items-center justify-center transition-colors w-10 h-10 md:w-9 md:h-9 xs:w-8 xs:h-8 tiny:w-6 tiny:h-6 hover:text-gray-200"

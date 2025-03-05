@@ -1,19 +1,12 @@
-// PopupMessage.tsx
 import React from 'react';
 
-// 팝업 인터페이스 정의
-export interface Popup {
-  id: number;
-  top: string;
-  left: string;
-  message: string;
-  rotation: number;
-  scale: number;
-}
-
-// 컴포넌트 Props 인터페이스
 interface PopupMessageProps {
-  popups: Popup[];
+  popups: Array<{
+    id: number;
+    message: string;
+    x: number;
+    y: number;
+  }>;
   onRemove: (id: number) => void;
   characterColor: string;
 }
@@ -21,27 +14,30 @@ interface PopupMessageProps {
 export const PopupMessage: React.FC<PopupMessageProps> = ({ 
   popups, 
   onRemove, 
-
+  characterColor 
 }) => {
   return (
     <>
-      {popups.map(popup => (
-        <span
+      {popups.map((popup) => (
+        <div
           key={popup.id}
-          className="popup text-2xl md:text-xl xs:text-base"
-          style={{ 
-            top: popup.top, 
-            left: popup.left, 
-            transform: `rotate(${popup.rotation}deg) scale(${popup.scale})`,
-            textShadow: '0 1px 3px rgba(0,0,0,0.3)',
-            fontSize: `calc(1em * ${popup.scale})`,
-            fontWeight: 'bold',
-            color: 'white'
+          className="popup text-lg font-bold"
+          style={{
+            left: `${popup.x}px`,
+            top: `${popup.y}px`,
+            color: 'white',
+            // 캐릭터의 색상을 기반으로 한 그림자 효과 추가
+            textShadow: `
+              -1px -1px 0 ${characterColor},
+              1px -1px 0 ${characterColor},
+              -1px 1px 0 ${characterColor},
+              1px 1px 0 ${characterColor}
+            `
           }}
           onAnimationEnd={() => onRemove(popup.id)}
         >
           {popup.message}
-        </span>
+        </div>
       ))}
     </>
   );
